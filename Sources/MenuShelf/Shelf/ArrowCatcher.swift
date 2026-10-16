@@ -34,7 +34,7 @@ final class ArrowCatcher {
             return
         }
         // A little wider and taller than the glyph, like the native hit area.
-        let ax = CGRect(x: arrow.minX - 6, y: arrow.minY - 1, width: arrow.width + 12, height: arrow.height + 2)
+        let ax = Self.coverRectAX(for: arrow)
         window.setFrame(BarReader.cocoaRect(ax), display: true)
         window.orderFrontRegardless()
     }
@@ -42,19 +42,36 @@ final class ArrowCatcher {
     var frame: NSRect { window.frame }
     var isShown: Bool { window.isVisible }
 
-    func setOpen(_ open: Bool) { view.isOpen = open }
+    /// Open state: `cover` is a capture of the bar under the arrow, mirrored,
+    /// so it shows » in macOS's own weight and colour on the same background
+    /// and hides the « underneath; no capsule, like the native expanded
+    /// control. Without Screen Recording, a capsule fallback.
+    func setOpen(_ open: Bool, cover: NSImage? = nil) {
+        view.cover = cover
+        view.isOpen = open
+    }
+
+    /// Catcher rect in AX coordinates for `arrow` (for background patches).
+    static func coverRectAX(for arrow: CGRect) -> CGRect {
+        CGRect(x: arrow.minX - 6, y: arrow.minY - 1, width: arrow.width + 12, height: arrow.height + 2)
+    }
 }
 
 private final class CatcherView: NSView {
     var onClick: (() -> Void)?
     var onRightClick: ((NSEvent) -> Void)?
     var isOpen = false { didSet { needsDisplay = true } }
+    var cover: NSImage?
 
     override func draw(_ dirtyRect: NSRect) {
         // Must not be fully transparent, or clicks fall through to the bar.
         NSColor.black.withAlphaComponent(0.005).setFill()
         bounds.fill()
         guard isOpen else { return }
+        if let cover {
+            cover.draw(in: bounds)
+            return
+        }
         let capsule = NSRect(x: 2, y: (bounds.height - 24) / 2, width: bounds.width - 4, height: 24)
         let path = NSBezierPath(roundedRect: capsule, xRadius: 12, yRadius: 12)
         // Opaque enough to hide the native « underneath.

@@ -44,31 +44,27 @@ final class ItemImageCache {
         UserDefaults.standard.set(order, forKey: "itemOrder")
     }
 
-    /// Captures the bar strip of `screen` once and crops every item on it.
+    /// Captures the menu bar's item layer once and crops every item on it.
+    /// The layer has a transparent background, so the images carry no bar
+    /// tint and sit cleanly on any background (no boxes behind icons).
     func capture(_ items: [MenuBarItem], on screen: BarReader.ScreenInfo?) async {
         rememberOrder(items)
         guard Self.canCapture, let screen else { return }
         let onScreen = items.filter { $0.frame.map(screen.containsAX) ?? false }
-        guard let barHeight = onScreen.compactMap({ $0.frame.map { ($0.midY - screen.axTop) * 2 } }).max(), barHeight > 10 else { return }
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return }
+            guard let bar = BarCapture.menubarWindow(in: content, screen: screen) else {
+                Log.write("Item capture: no Menubar window for display \(screen.displayID)")
+                return
+            }
             let scale = screen.scale
-            let config = SCStreamConfiguration()
-            config.sourceRect = CGRect(x: 0, y: 0, width: screen.frame.width, height: barHeight)
-            config.width = Int(screen.frame.width * scale)
-            config.height = Int(barHeight * scale)
-            config.showsCursor = false
-            // Leave our own windows (panel, catcher) out of the picture.
-            let own = content.windows.filter { $0.owningApplication?.processID == ProcessInfo.processInfo.processIdentifier }
-            let filter = SCContentFilter(display: display, excludingWindows: own)
-            let strip = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+            let layer = try await BarCapture.captureLayer(bar, scale: scale)
             var saved = 0
             for item in onScreen {
                 guard let f = item.frame, f.width > 2 else { continue }
-                let crop = CGRect(x: (f.minX - screen.frame.minX) * scale, y: 0, width: f.width * scale, height: barHeight * scale)
-                guard let cg = strip.cropping(to: crop) else { continue }
-                let image = NSImage(cgImage: cg, size: NSSize(width: f.width, height: barHeight))
+                let crop = CGRect(x: (f.minX - bar.frame.minX) * scale, y: 0, width: f.width * scale, height: bar.frame.height * scale).integral
+                guard let cg = layer.cropping(to: crop) else { continue }
+                let image = NSImage(cgImage: cg, size: NSSize(width: f.width, height: bar.frame.height))
                 let key = BarReader.key(for: item)
                 images[key] = image
                 if let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
@@ -76,7 +72,7 @@ final class ItemImageCache {
                 }
                 saved += 1
             }
-            Log.write("Captured \(saved) item images on display \(screen.displayID)")
+            Log.write("Captured \(saved) item images (transparent) on display \(screen.displayID)")
         } catch {
             Log.write("Item capture failed: \(error.localizedDescription)")
         }
@@ -91,5 +87,38 @@ final class ItemImageCache {
 extension NSScreen {
     var displayID: CGDirectDisplayID {
         (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+    }
+}
+
+// MARK: - Debug: capture each menu bar window on its own (`--debug`, "barwindows")
+
+extension ItemImageCache {
+    static func debugCaptureBarWindows() async {
+        let out = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MenuShelf/debug", isDirectory: true)
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            let bar = content.windows.filter { $0.frame.minY < 2 && $0.frame.height < 60 && $0.frame.width > 600 }
+            for (i, window) in bar.enumerated() {
+                let owner = window.owningApplication?.bundleIdentifier ?? "nil"
+                let config = SCStreamConfiguration()
+                config.width = Int(window.frame.width * 2)
+                config.height = Int(window.frame.height * 2)
+                config.showsCursor = false
+                config.ignoreShadowsSingleWindow = true
+                config.backgroundColor = .clear
+                let filter = SCContentFilter(desktopIndependentWindow: window)
+                do {
+                    let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                    let url = out.appendingPathComponent("bar-\(i)-\(owner)-layer\(window.windowLayer).png")
+                    if let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) { try? data.write(to: url) }
+                    Log.write("DEBUG barwindow \(i) owner=\(owner) title=\(window.title ?? "") layer=\(window.windowLayer) frame=\(window.frame) alphaInfo=\(image.alphaInfo.rawValue) → \(url.lastPathComponent)")
+                } catch {
+                    Log.write("DEBUG barwindow \(i) owner=\(owner) capture failed: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            Log.write("DEBUG barwindows failed: \(error.localizedDescription)")
+        }
     }
 }

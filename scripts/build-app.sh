@@ -20,7 +20,11 @@ cp Support/Info.plist "$APP/Contents/Info.plist"
 # rebuilds. Otherwise sign ad hoc, and TCC ties grants to this exact binary,
 # so you must re-enable MenuShelf in System Settings after every rebuild.
 # No hardened runtime and no sandbox: MenuShelf uses Accessibility.
-IDENTITY="${SIGN_IDENTITY:-MenuShelf Dev}"
+# A self-signed certificate is "not trusted", so `find-identity -v` hides
+# it; list without -v. Any identity whose name starts with "MenuShel"
+# matches (covers "MenuShelf Dev" and a "MenuShel Dev" typo).
+IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning | sed -n 's/.*"\(MenuShel[^"]*\)".*/\1/p' | head -1)}"
+IDENTITY="${IDENTITY:-MenuShelf Dev}"
 if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
     codesign --force --sign "$IDENTITY" --identifier dev.menushelf.MenuShelf "$APP"
     echo "Signed with \"$IDENTITY\""

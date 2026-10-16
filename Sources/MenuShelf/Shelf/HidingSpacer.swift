@@ -22,8 +22,6 @@ final class HidingSpacer {
     static let arrowAllowance: CGFloat = 53
     static let margin: CGFloat = 8
     static let maxWidth: CGFloat = 740
-    /// AX frame offset of an overflowed spacer vs. the same spacer fitting.
-    static let overflowShift: CGFloat = 8
 
     init() {
         item = NSStatusBar.system.statusItem(withLength: 300)
@@ -41,13 +39,42 @@ final class HidingSpacer {
         render()
     }
 
-    /// Recomputes the width from where the spacer sits now. Returns true when
-    /// it changed. `arrow` tells whether the spacer is currently overflowed.
+    /// Revealed: the hidden items are back on the real bar (after an item was
+    /// clicked in the panel). The spacer shrinks to a small item showing »;
+    /// its right edge stays put, so the » sits exactly where the arrow was.
+    private(set) var isRevealed = false
+    private var hiddenLength: CGFloat = 300
+
+    func setRevealed(_ revealed: Bool) {
+        guard revealed != isRevealed else { return }
+        isRevealed = revealed
+        if revealed {
+            hiddenLength = item.length
+            item.length = Self.editWidth
+        } else {
+            item.length = hiddenLength
+        }
+        render()
+    }
+
+    /// Makes sure the spacer overflows. Returns true when the width changed.
+    ///
+    /// Only an AX frame read while the spacer *fits* is reliable (it grows
+    /// leftward from a fixed right edge). Once it overflows, macOS reports it
+    /// at a parked spot that depends on the layout, so an overflowed spacer is
+    /// left alone: a little extra width costs nothing now that macOS's own
+    /// expansion (and its gap) is never shown. While it fits, it grows to the
+    /// measured threshold (`rightEdge − boundary − 53 pt` with an arrow already
+    /// on the bar, ~30 pt more without), at least 24 pt per step.
     @discardableResult
     func fit(spacerFrame: CGRect, arrow: CGRect?, boundary: CGFloat) -> Bool {
-        guard !isEditing, boundary > 0 else { return false }
+        guard !isEditing, !isRevealed, boundary > 0 else { return false }
         let overflowed = arrow.map { spacerFrame.minX < $0.minX } ?? false
-        let rightEdge = spacerFrame.maxX + (overflowed ? Self.overflowShift : 0)
+        guard !overflowed else {
+            if item.length > Self.maxWidth { item.length = Self.maxWidth; render(); return true }
+            return false
+        }
+        let rightEdge = spacerFrame.maxX
         let target = (rightEdge - boundary - Self.arrowAllowance + Self.margin).rounded()
         // A display with more free space than a spacer can safely span (wide
         // external screens without a notch) can't hide anything. Leave the
@@ -60,11 +87,10 @@ final class HidingSpacer {
             }
             return false
         }
-        let clamped = max(target, Self.editWidth + 1)
-        // Hysteresis: every change relayouts the bar.
-        guard abs(clamped - item.length) > 3 else { return false }
-        Log.write("Spacer width \(Int(item.length)) → \(Int(clamped)) (right edge \(Int(rightEdge)), boundary \(Int(boundary)), overflowed \(overflowed))")
-        item.length = clamped
+        let next = min(max(target, item.length + 24), Self.maxWidth)
+        guard next != item.length else { return false }
+        Log.write("Spacer still fits: width \(Int(item.length)) → \(Int(next)) (right edge \(Int(rightEdge)), boundary \(Int(boundary)))")
+        item.length = next
         render()
         return true
     }
@@ -72,6 +98,17 @@ final class HidingSpacer {
     private func render() {
         let length = max(item.length, Self.editWidth)
         let editing = isEditing
+        if isRevealed, !editing {
+            let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+            let glyph = NSImage(systemSymbolName: "chevron.forward.2", accessibilityDescription: "Hide Menu Bar Items")?
+                .withSymbolConfiguration(config)
+            glyph?.isTemplate = true
+            item.button?.image = glyph
+            item.button?.imagePosition = .imageOnly
+            item.button?.toolTip = "Hide Menu Bar Items"
+            return
+        }
+        item.button?.toolTip = "MenuShelf divider — ⌘-drag icons to its left to hide them"
         let image = NSImage(size: NSSize(width: length, height: 22), flipped: false) { rect in
             // Near-transparent fill so the item has real content.
             NSColor.black.withAlphaComponent(0.004).setFill()
