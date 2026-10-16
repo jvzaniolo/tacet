@@ -15,7 +15,7 @@ Menus" do macOS.
 
 ## Instalação
 
-1. Baixe `Tacet-<versão>-beta.dmg` e abra.
+1. Baixe o `Tacet-<versão>-beta.<n>.dmg` pelo seu link do Gumroad e abra.
 2. Arraste o **Tacet** para **Aplicativos**.
 3. Abra o Tacet em Aplicativos. Na primeira vez, o macOS bloqueia porque o
    beta não é notarizado pela Apple. Para permitir:

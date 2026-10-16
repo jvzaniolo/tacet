@@ -14,7 +14,7 @@ arrow, using macOS's own "Allow in the Menu Bar" switches.
 
 ## Install
 
-1. Download `Tacet-<version>-beta.dmg` and open it.
+1. Download `Tacet-<version>-beta.<n>.dmg` from your Gumroad link and open it.
 2. Drag **Tacet** onto **Applications**.
 3. Open Tacet from Applications. The first time, macOS blocks it because the
    beta isn't notarized by Apple. To allow it:
