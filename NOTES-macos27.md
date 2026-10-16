@@ -443,7 +443,7 @@ verdict a live sizer wasn't pursued further:
 | Need | Permission-free source (verified) |
 | --- | --- |
 | Spacer's right edge | Spacer's own `button.window.frame.maxX` (−7 pt). It stays constant as the spacer grows, overflowed or not. |
-| Did it overflow? | Own window `maxX` moves left by 8 pt at the threshold (1349 → 1341, and 1477 → 1469 in the second layout's sweep data) |
+| Did it overflow? | Own window `maxX` moves left by 8 pt at the threshold (1349 → 1341). Seen in the first layout only: the second sweep ran with the overflow open. |
 | Is the overflow open? | Own window jumps into the left area (x 1043 → 472) |
 | Notch boundary | `NSScreen.auxiliaryTopRightArea.minX` / `auxiliaryTopLeftArea.maxX` |
 | Non-notch boundary (end of app menus) | No public permission-free source found. AX `kAXMenuBarAttribute` of the frontmost app works. |
