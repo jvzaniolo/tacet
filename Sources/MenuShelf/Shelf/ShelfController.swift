@@ -184,6 +184,9 @@ final class ShelfController {
     private var closeRequested = false
     /// The arrow's AX frame when we revealed; the catcher stays there.
     private var revealArrow: CGRect?
+    /// Keys of the items we revealed (not whole apps: one app can have an
+    /// item on each side of the divider).
+    private var revealedKeys: Set<String> = []
 
     private var nativeReveal: Bool {
         (UserDefaults.standard.string(forKey: "pressMode") ?? "native") == "native"
@@ -264,23 +267,24 @@ final class ShelfController {
     /// between items (from the last time they were on the bar). Exact as long
     /// as the set of hidden items hasn't changed.
     private func expectedPositions(of items: [MenuBarItem], arrow: CGRect) -> [String: CGFloat] {
-        let gapToArrow = UserDefaults.standard.object(forKey: "revealGap") as? Double ?? 30
         let keys = items.map(BarReader.key(for:))
-        let widths = zip(items, keys).map { item, key in images.image(for: key)?.size.width ?? item.frame?.width ?? 24 }
-        var spacing: [CGFloat] = []
-        for i in 0..<max(items.count - 1, 0) {
-            if let a = images.order[keys[i]], let b = images.order[keys[i + 1]] {
-                spacing.append(min(max(b - a - widths[i], 0), 24))
-            } else {
-                spacing.append(4)
-            }
+        guard let lastKey = keys.last else { return [:] }
+        let gapToArrow = CGFloat(UserDefaults.standard.object(forKey: "revealGap") as? Double ?? 30)
+        let lastWidth = images.image(for: lastKey)?.size.width ?? items.last?.frame?.width ?? 24
+        let lastX = arrow.minX - gapToArrow - lastWidth
+        // Best: the real positions from the last time these items were on the
+        // bar, shifted so the last one sits where macOS will put it.
+        if keys.allSatisfy({ images.order[$0] != nil }), let lastOrder = images.order[lastKey] {
+            let shift = lastX - lastOrder
+            return Dictionary(uniqueKeysWithValues: keys.map { ($0, (images.order[$0]! + shift).rounded()) })
         }
-        let total = widths.reduce(0, +) + spacing.reduce(0, +)
-        var x = arrow.minX - CGFloat(gapToArrow) - total
+        // Otherwise pack them right-aligned with 4 pt between items.
         var result: [String: CGFloat] = [:]
-        for (i, key) in keys.enumerated() {
+        var x = lastX
+        for (item, key) in zip(items, keys).reversed() {
+            let width = images.image(for: key)?.size.width ?? item.frame?.width ?? 24
+            if key != lastKey { x -= width + 4 }
             result[key] = x.rounded()
-            x += widths[i] + (i < spacing.count ? spacing[i] : 0)
         }
         return result
     }
@@ -299,6 +303,7 @@ final class ShelfController {
         revealArrow = arrow
         let hidden = snapshot.hidden
         revealedPIDs = Set(hidden.map(\.pid))
+        revealedKeys = Set(hidden.map(BarReader.key(for:)))
         revealBaseline = Set(revealedPIDs.flatMap { MenuTracker.windows(of: $0).map(\.id) })
         let parked = Dictionary(hidden.compactMap { item in MenuBarEnumerator.frame(of: item.element).map { (BarReader.key(for: item), $0.minX) } },
                                 uniquingKeysWith: { a, _ in a })
@@ -509,7 +514,7 @@ final class ShelfController {
         Task { @MainActor in
             let snap = await Task.detached { BarReader.snapshot(spacerLength: length) }.value
             guard token == self.phaseToken else { return }
-            let revealed = snap.visible.filter { self.revealedPIDs.contains($0.pid) }
+            let revealed = snap.visible.filter { self.revealedKeys.contains(BarReader.key(for: $0)) }
                 .sorted { ($0.frame?.minX ?? 0) < ($1.frame?.minX ?? 0) }
             var xs: [String: CGFloat] = [:]
             for item in revealed { if let f = item.frame { xs[BarReader.key(for: item)] = f.minX } }
@@ -528,6 +533,7 @@ final class ShelfController {
                 self.cover.hide(fade: 0.08)
                 self.catcher.setOpen(false)
                 self.revealedPIDs = []
+                self.revealedKeys = []
                 self.revealBaseline = []
                 self.phase = .hidden
                 self.scheduleRefresh()
