@@ -1179,3 +1179,6 @@ a link to System Settings, never a switch, so they can't be mistaken for
 - **Caption (user):** only "Hold ⌘ and drag the » arrow to the right of the
   apps you hide." (en/pt-BR/es). The play button is disabled while the
   animation plays.
+- **Copy trims (user):** the arrow caption is left-aligned; the "Hide in Tacet"
+  subtitle is just "Apps turned on here hide behind Tacet's arrow."; the list
+  footer ("Apps appear here after their first time…") is gone.

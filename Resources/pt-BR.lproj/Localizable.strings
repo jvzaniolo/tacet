@@ -24,10 +24,9 @@
 
 /* App list */
 "Hide in Tacet" = "Ocultar no Tacet";
-"Apps turned on here hide behind Tacet’s arrow. Click « in the menu bar to show them." = "Os apps ativados aqui ficam ocultos atrás da seta do Tacet. Clique em « na Barra de Menus para mostrá-los.";
+"Apps turned on here hide behind Tacet’s arrow." = "Os apps ativados aqui ficam ocultos atrás da seta do Tacet.";
 "Hide %@ in Tacet" = "Ocultar %@ no Tacet";
 "No apps yet." = "Nenhum app ainda.";
-"Apps appear here after their first time in the menu bar." = "Os apps aparecem aqui depois da primeira vez na Barra de Menus.";
 "Turned Off in System Settings" = "Desativados nos Ajustes do Sistema";
 "Off" = "Desativado";
 "Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them." = "Ocultos pelo macOS, não pelo Tacet: a « não os mostra. Ative-os nos Ajustes do Sistema para usá-los.";

@@ -189,15 +189,12 @@ private struct AppListView: View {
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Hide in Tacet")
-                    Text("Apps turned on here hide behind Tacet’s arrow. Click « in the menu bar to show them.")
+                    Text("Apps turned on here hide behind Tacet’s arrow.")
                         .font(.callout)
                         .fontWeight(.regular)
                         .foregroundStyle(.secondary)
                         .textCase(nil)
                 }
-            } footer: {
-                Text("Apps appear here after their first time in the menu bar.")
-                    .foregroundStyle(.secondary)
             }
 
             if !offInSettings.isEmpty {
@@ -278,7 +275,7 @@ private struct ArrowPlacementSection: View {
                 Text("Hold ⌘ and drag the » arrow to the right of the apps you hide.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
