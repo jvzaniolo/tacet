@@ -71,6 +71,9 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   back on. Quit Tacet before deleting it. After a crash, the journal
   (`~/Library/Application Support/Tacet/journal.plist`) lets the next
   launch pick the hidden apps up again.
+- **Arrow position:** on a new install macOS puts Tacet's arrow at the far
+  left. Settings shows a short animation: click «, then hold ⌘ and drag the
+  arrow to the right of your hidden apps, once.
 - **Speed tip (optional):** ⌘-drag your hidden apps to the left end of the
   menu bar. Then they fade in and out quickly (~0.15 s); elsewhere the icons
   next to them slide over (~0.45 s).
@@ -134,7 +137,6 @@ Sources/Tacet/
   MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
   ShelfModel.swift            Hidden apps, three states, reconcile, journal
   ShelfController.swift       The arrow, its menu and the close rules
-  ArrowGuide.swift            Arrow position check (own frame) for the placement step
   SettingsWindow.swift        Welcome/access step and the app list (SwiftUI)
   MenuTracker.swift           On-screen menus/popovers via CGWindowList
   Log.swift                   Console / unified log / ~/Library/Logs output

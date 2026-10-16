@@ -37,14 +37,7 @@
 
 /* Arrow Position */
 "Arrow Position" = "Arrow Position";
-"The arrow is right of your hidden apps." = "The arrow is right of your hidden apps.";
-"Check Again" = "Check Again";
-"Some hidden apps appear to the right of the arrow." = "Some hidden apps appear to the right of the arrow.";
-"1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position." = "1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position.";
-"Checking…" = "Checking…";
-"Show Hidden Apps" = "Show Hidden Apps";
-"Check Position" = "Check Position";
-"New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow." = "New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow.";
+"Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Click « and hold ⌘ to drag the arrow to the right of your hidden apps.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Show Hidden Menu Bar Items";

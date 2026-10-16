@@ -1148,3 +1148,25 @@ a link to System Settings, never a switch, so they can't be mistaken for
 - Checked with screenshots in each language (`-AppleLanguages`) and with the
   system in pt-BR: one Spanish heading was truncated in the welcome window;
   headings now wrap. The Settings window is a bit taller (min 560 pt).
+
+### Update: check removed, animation only (user feedback)
+
+- The "Arrow Position" section now shows only a looping animation (a mini menu
+  bar in system colors: the pointer holds ⌘, drags » from left of three icons
+  to their right, the icons step aside) and a one-line caption ("Click « and
+  hold ⌘ to drag the arrow to the right of your hidden apps."), en/pt-BR/es.
+  It shows » rather than «: during the drag the hidden apps are shown, so
+  that is what the user sees.
+- **Removed:** the green status, Check Again, Check Position / Show Hidden
+  Apps, and all position detection (`ArrowGuide`, the per-reveal x check and
+  its auto-prompt). They only served the check; onboarding needs none of it,
+  because the first-run flow ends on the list, where the animation is the
+  first section. Trade-off: Tacet no longer notices by itself when the arrow
+  is misplaced (e.g. on a new install); the animation is always there.
+- **Freeze:** the first version used `PhaseAnimator` with a `nil` animation
+  for the reset phase. With Settings open it spun the main thread at ~100 %
+  CPU (Tacet hung; it was killed with SIGKILL and the journal recovery
+  brought the 5 hidden apps back on relaunch). Now a `TimelineView` draws
+  each frame as a pure function of the clock, on a schedule that runs at
+  30 fps only while something moves: ~4–7 % CPU with the window open, ~0
+  when closed. Tested first in a standalone harness, not in the user's Tacet.

@@ -4,7 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = ShelfModel()
     private lazy var shelf = ShelfController(model: model)
-    private lazy var settings = SettingsWindowController(model: model, guide: shelf.guide)
+    private lazy var settings = SettingsWindowController(model: model)
     private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {

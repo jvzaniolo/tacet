@@ -37,14 +37,7 @@
 
 /* Arrow Position */
 "Arrow Position" = "Posição da Seta";
-"The arrow is right of your hidden apps." = "A seta está à direita dos apps ocultos.";
-"Check Again" = "Verificar de Novo";
-"Some hidden apps appear to the right of the arrow." = "Alguns apps ocultos aparecem à direita da seta.";
-"1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position." = "1. Clique em Mostrar Apps Ocultos.\n2. Mantenha ⌘ pressionado e arraste a seta » para a direita dos apps que você oculta.\n3. Clique em Verificar Posição.";
-"Checking…" = "Verificando…";
-"Show Hidden Apps" = "Mostrar Apps Ocultos";
-"Check Position" = "Verificar Posição";
-"New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow." = "Novos itens da Barra de Menus começam na ponta esquerda, e só você pode movê-los. Depois disso, os apps ocultos aparecem à esquerda da seta.";
+"Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Clique em « e mantenha ⌘ pressionado para arrastar a seta para a direita dos apps ocultos.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Mostrar Itens Ocultos da Barra de Menus";

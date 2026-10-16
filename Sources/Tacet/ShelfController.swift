@@ -8,7 +8,6 @@ import AppKit
 @MainActor
 final class ShelfController {
     let model: ShelfModel
-    let guide = ArrowGuide()
     private let arrow = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var mouseMonitor: Any?
     private var keyMonitor: Any?
@@ -17,8 +16,6 @@ final class ShelfController {
     /// Windows the hidden apps had on screen when revealed; newer ones are
     /// their menus or popovers.
     private var revealBaseline: Set<CGWindowID> = []
-    /// The arrow-position prompt opens Settings at most once per launch.
-    private var promptedForPlacement = false
 
     var openSettings: (() -> Void)?
 
@@ -37,11 +34,6 @@ final class ShelfController {
             (button.cell as? NSButtonCell)?.highlightsBy = []
             (button.cell as? NSButtonCell)?.showsStateBy = []
         }
-        guide.showForPlacing = { [weak self] in
-            self?.reveal(pinned: true)
-            self?.guide.placing = true
-        }
-        guide.check = { [weak self] in self?.checkPlacement() }
         render()
         conceal()
     }
@@ -50,7 +42,6 @@ final class ShelfController {
 
     func conceal() {
         pinned = false
-        if guide.state != .checking { guide.placing = false }
         removeMonitors()
         model.conceal()
         render()
@@ -59,77 +50,11 @@ final class ShelfController {
     func reveal(pinned: Bool = false) {
         self.pinned = pinned
         revealBaseline = Set(hiddenPIDs().flatMap { MenuTracker.windows(of: $0).map(\.id) })
-        let concealedX = arrowX
         model.reveal()
         render()
         if pinned { removeMonitors() } else { installMonitors() }
-        if guide.state != .checking { watchPlacement(from: concealedX) }
     }
 
-    // MARK: Arrow position (NOTES §15)
-
-    /// Our own item's x on screen. Its window is a zero-height stub on macOS
-    /// 27, so only x is meaningful. No permission needed.
-    private var arrowX: CGFloat? {
-        guard let window = arrow.button?.window, window.screen != nil else { return nil }
-        return window.frame.minX
-    }
-
-    /// Animations take up to ~0.5 s; read the frame after they settle.
-    private static let settle: TimeInterval = 0.8
-
-    /// Every reveal doubles as a check: if the arrow moved left, revealed
-    /// apps appeared to its right.
-    private func watchPlacement(from concealedX: CGFloat?) {
-        guard let concealedX, !hiddenPIDs().isEmpty else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settle) { [weak self] in
-            guard let self, self.model.revealed, self.guide.state != .checking, let revealedX = self.arrowX else { return }
-            let result = self.judge(concealedX: concealedX, revealedX: revealedX, source: "reveal")
-            if result == .misplaced, !self.guide.placing, !self.promptedForPlacement {
-                self.promptedForPlacement = true
-                self.openSettings?()
-            }
-        }
-    }
-
-    @discardableResult
-    private func judge(concealedX: CGFloat, revealedX: CGFloat, source: String) -> ArrowGuide.State? {
-        let shift = concealedX - revealedX
-        let result = ArrowGuide.judge(shift: shift)
-        Log.write("Arrow (\(source)): x \(Int(concealedX)) concealed, \(Int(revealedX)) revealed → \(result.map { "\($0)" } ?? "inconclusive")")
-        if let result { guide.set(result) }
-        return result
-    }
-
-    /// "Check Position": hide, read x, show, read x. In place → hide again;
-    /// otherwise stay shown so the user can drag again.
-    func checkPlacement() {
-        guard model.access == .granted, model.hasHiddenApps, !hiddenPIDs().isEmpty else {
-            Log.write("Arrow check: no running hidden app to compare with")
-            return
-        }
-        guide.set(.checking)
-        conceal()
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settle) { [weak self] in
-            guard let self else { return }
-            let concealedX = self.arrowX
-            self.reveal(pinned: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.settle) { [weak self] in
-                guard let self else { return }
-                guard let concealedX, let revealedX = self.arrowX else {
-                    self.guide.set(.unknown)
-                    return
-                }
-                let result = self.judge(concealedX: concealedX, revealedX: revealedX, source: "check") ?? .unknown
-                if result == .inPlace {
-                    self.conceal()
-                } else {
-                    if result == .unknown { self.guide.set(.unknown) }
-                    self.guide.placing = true
-                }
-            }
-        }
-    }
 
     private func render() {
         let open = model.revealed

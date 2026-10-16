@@ -37,14 +37,7 @@
 
 /* Arrow Position */
 "Arrow Position" = "Posición de la flecha";
-"The arrow is right of your hidden apps." = "La flecha está a la derecha de las apps ocultas.";
-"Check Again" = "Volver a comprobar";
-"Some hidden apps appear to the right of the arrow." = "Algunas apps ocultas aparecen a la derecha de la flecha.";
-"1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position." = "1. Haz clic en Mostrar apps ocultas.\n2. Mantén pulsada ⌘ y arrastra la flecha » a la derecha de las apps que ocultas.\n3. Haz clic en Comprobar posición.";
-"Checking…" = "Comprobando…";
-"Show Hidden Apps" = "Mostrar apps ocultas";
-"Check Position" = "Comprobar posición";
-"New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow." = "Los nuevos ítems de la barra de menús empiezan en el extremo izquierdo y solo tú puedes moverlos. Después, las apps ocultas aparecen a la izquierda de la flecha.";
+"Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Haz clic en « y mantén pulsada ⌘ para arrastrar la flecha a la derecha de las apps ocultas.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Mostrar los ítems ocultos de la barra de menús";

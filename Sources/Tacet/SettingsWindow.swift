@@ -7,14 +7,12 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let model: ShelfModel
-    private let guide: ArrowGuide
     private let ui = SettingsUIState()
     private var window: NSWindow?
     private var timer: Timer?
 
-    init(model: ShelfModel, guide: ArrowGuide) {
+    init(model: ShelfModel) {
         self.model = model
-        self.guide = guide
     }
 
     var needsWelcome: Bool { model.access != .granted || !ui.didOnboard }
@@ -22,7 +20,7 @@ final class SettingsWindowController {
     func show() {
         model.refresh()
         if window == nil {
-            let view = SettingsRoot(model: model, guide: guide, ui: ui)
+            let view = SettingsRoot(model: model, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Tacet"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -59,13 +57,12 @@ final class SettingsUIState {
 
 private struct SettingsRoot: View {
     let model: ShelfModel
-    let guide: ArrowGuide
     let ui: SettingsUIState
 
     var body: some View {
         Group {
             if model.access == .granted && ui.didOnboard {
-                AppListView(model: model, guide: guide)
+                AppListView(model: model)
             } else {
                 WelcomeView(model: model, ui: ui)
             }
@@ -154,7 +151,6 @@ private struct Point: View {
 
 private struct AppListView: View {
     let model: ShelfModel
-    let guide: ArrowGuide
 
     private var managed: [ShelfModel.Row] { model.rows.filter { $0.status != .offInSystemSettings } }
     private var offInSettings: [ShelfModel.Row] { model.rows.filter { $0.status == .offInSystemSettings } }
@@ -165,7 +161,7 @@ private struct AppListView: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
             if model.hasHiddenApps {
-                ArrowPlacementSection(guide: guide, hiddenIcons: managed.filter { $0.status == .hidden }.map(\.icon))
+                ArrowPlacementSection()
             }
 
             Section {
@@ -245,100 +241,144 @@ private struct AppRow<Accessory: View>: View {
 
 // MARK: Arrow position
 
-/// Shown until the arrow is right of the hidden apps (NOTES §15). On first
-/// launch macOS puts a new item at the far left, and only a ⌘-drag moves it.
+/// How to put the arrow right of the hidden apps (NOTES §15). On first launch
+/// macOS puts a new item at the far left, and only a ⌘-drag moves it.
 private struct ArrowPlacementSection: View {
-    let guide: ArrowGuide
-    let hiddenIcons: [NSImage]
-
     var body: some View {
         Section {
-            if guide.state == .inPlace {
-                HStack {
-                    Label("The arrow is right of your hidden apps.", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Spacer()
-                    Button("Check Again") { guide.check() }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    PlacementIllustration(icons: hiddenIcons)
-                        .frame(maxWidth: .infinity)
-                    if guide.state == .misplaced {
-                        Text("Some hidden apps appear to the right of the arrow.")
-                            .foregroundStyle(.orange)
-                    }
-                    Text("1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position.")
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        if guide.state == .checking {
-                            ProgressView().controlSize(.small)
-                            Text("Checking…").foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Show Hidden Apps") { guide.showForPlacing() }
-                            .disabled(guide.placing || guide.state == .checking)
-                        Button("Check Position") { guide.check() }
-                            .keyboardShortcut(.defaultAction)
-                            .disabled(guide.state == .checking)
-                    }
-                }
+            VStack(spacing: 10) {
+                DragAnimation()
+                Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         } header: {
             Text("Arrow Position")
-        } footer: {
-            if guide.state != .inPlace {
-                Text("New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow.")
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }
 
-/// A sketch of the menu bar: the arrow moves from the far left to the right
-/// of the hidden apps, as the ⌘-drag should.
-private struct PlacementIllustration: View {
-    let icons: [NSImage]
+/// A looping sketch of the ⌘-drag on a mini menu bar: the pointer grabs the
+/// arrow, which sits left of three app icons, and drops it to their right.
+/// Neutral template glyphs and system colors, so it reads as a menu bar in
+/// light and dark mode.
+///
+/// Driven by a 30 fps timeline from the clock, not a phase animator: every
+/// frame is a pure function of the time, so it can't loop on itself (a
+/// PhaseAnimator version spun the main thread at 100 %, NOTES §15).
+struct DragAnimation: View {
+    private static let slot: CGFloat = 26
+    private static let glyphs = ["circle.hexagongrid.fill", "bolt.horizontal.circle", "cloud.fill"]
+    private static let cycle: Double = 4.0
+    private var appsWidth: CGFloat { CGFloat(Self.glyphs.count) * Self.slot }
 
-    private static let slot: CGFloat = 28
-    private var count: Int { max(1, min(icons.count, 4)) }
+    /// The parts of the cycle where something moves; the rest is still, so
+    /// the timeline only redraws at its edges.
+    private static let moving: [ClosedRange<Double>] = [0.8...1.2, 1.6...2.6, 3.0...3.4]
 
-    var body: some View {
-        PhaseAnimator([false, true]) { placed in
-            HStack(spacing: 14) {
-                ZStack(alignment: .leading) {
-                    HStack(spacing: 10) {
-                        ForEach(0..<count, id: \.self) { i in
-                            icon(i).frame(width: 18, height: 18)
-                        }
-                    }
-                    .offset(x: placed ? 0 : Self.slot)
-                    VStack(spacing: 2) {
-                        Image(systemName: "chevron.forward.2")
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 18, height: 18)
-                        Text("⌘").font(.caption2.bold()).opacity(placed ? 0 : 1)
-                    }
-                    .offset(x: placed ? CGFloat(count) * Self.slot : 0, y: 7)
-                }
-                .frame(width: CGFloat(count + 1) * Self.slot - 10, height: 22, alignment: .leading)
-                Image(systemName: "wifi")
-                Image(systemName: "battery.75percent")
-                Text("12:00").font(.system(size: 12))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-        } animation: { _ in
-            .easeInOut(duration: 0.9).delay(1.2)
+    /// Seconds into the cycle → (arrow progress 0…1, pointer opacity, ⌘ shown).
+    private static func pose(_ t: Double) -> (move: CGFloat, pointer: Double, held: Bool) {
+        func ease(_ x: Double) -> CGFloat { CGFloat(x < 0.5 ? 2 * x * x : 1 - pow(-2 * x + 2, 2) / 2) }
+        switch t {
+        case ..<0.8: return (0, 0, false)                          // rest
+        case ..<1.2: return (0, (t - 0.8) / 0.4, false)            // pointer appears
+        case ..<1.6: return (0, 1, true)                           // ⌘ down, grab
+        case ..<2.6: return (ease((t - 1.6) / 1.0), 1, true)       // drag
+        case ..<3.0: return (1, 1, false)                          // drop
+        case ..<3.4: return (1, 1 - (t - 3.0) / 0.4, false)        // pointer leaves
+        default:     return (1, 0, false)                          // result stays
         }
     }
 
-    @ViewBuilder private func icon(_ i: Int) -> some View {
-        if i < icons.count {
-            Image(nsImage: icons[i]).resizable()
-        } else {
-            Image(systemName: "app.dashed").resizable()
+    var body: some View {
+        TimelineView(MotionSchedule(cycle: Self.cycle, moving: Self.moving)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.cycle)
+            let p = Self.pose(t)
+            bar(move: p.move, pointer: p.pointer, held: p.held)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps."))
+    }
+
+    private func bar(move: CGFloat, pointer: Double, held: Bool) -> some View {
+        HStack(spacing: 16) {
+            ZStack(alignment: .leading) {
+                // Each icon steps left as the arrow passes it, like the bar
+                // making room during a real drag.
+                let arrowSlots = move * CGFloat(Self.glyphs.count)
+                ForEach(Array(Self.glyphs.enumerated()), id: \.offset) { i, name in
+                    let passed = min(max(arrowSlots - CGFloat(i), 0), 1)
+                    Image(systemName: name)
+                        .frame(width: Self.slot, height: 22)
+                        .offset(x: Self.slot * (CGFloat(i) + 1 - passed))
+                }
+                // The dragged arrow floats above them.
+                Image(systemName: "chevron.forward.2")
+                    .fontWeight(.semibold)
+                    .frame(width: Self.slot, height: 22)
+                    .background(Color(nsColor: .windowBackgroundColor).opacity(held ? 0.9 : 0), in: RoundedRectangle(cornerRadius: 4))
+                    .shadow(color: .black.opacity(held ? 0.25 : 0), radius: 2, y: 1)
+                    .offset(x: appsWidth * move)
+            }
+            .frame(width: appsWidth + Self.slot, height: 22, alignment: .leading)
+            .overlay(alignment: .topLeading) {
+                // The pointer, with ⌘ held while it drags. An overlay, so it
+                // never changes the bar's layout.
+                HStack(alignment: .top, spacing: 2) {
+                    Image(systemName: "cursorarrow")
+                        .font(.system(size: 15))
+                        .shadow(color: .black.opacity(0.3), radius: 1)
+                    Text("⌘")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 3)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 3))
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.6), lineWidth: 0.5))
+                        .opacity(held ? 1 : 0)
+                }
+                .offset(x: appsWidth * move + 12, y: 12)
+                .opacity(pointer)
+            }
+            Image(systemName: "wifi")
+            Image(systemName: "battery.75percent")
+            Text(verbatim: "9:41")
+        }
+        .font(.system(size: 13))
+        .padding(.horizontal, 14)
+        .frame(height: 30)
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+        .padding(.bottom, 14)   // room for the pointer below the bar
+    }
+}
+
+/// 30 fps inside the moving spans of a repeating cycle, one frame at each
+/// still span's start. Keeps the animation's CPU near zero while it rests.
+private struct MotionSchedule: TimelineSchedule {
+    let cycle: Double
+    let moving: [ClosedRange<Double>]
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+        let fps = mode == .lowFrequency ? 1.0 : 30.0
+        var offsets: [Double] = [0]
+        for span in moving {
+            var t = span.lowerBound
+            while t < span.upperBound { offsets.append(t); t += 1 / fps }
+            offsets.append(span.upperBound)
+        }
+        let base = (startDate.timeIntervalSinceReferenceDate / cycle).rounded(.down) * cycle
+        var cycleStart = base
+        var index = 0
+        return AnyIterator {
+            while true {
+                if index == offsets.count { index = 0; cycleStart += cycle }
+                let date = Date(timeIntervalSinceReferenceDate: cycleStart + offsets[index])
+                index += 1
+                if date >= startDate { return date }
+            }
         }
     }
 }
