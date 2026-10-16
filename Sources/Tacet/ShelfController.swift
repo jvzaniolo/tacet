@@ -30,9 +30,13 @@ final class ShelfController {
         if let button = arrow.button {
             button.target = self
             button.action = #selector(arrowClicked)
-            // Mouse-down, like the native arrow. The light capsule shown
-            // while the button is held is macOS's press look.
-            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+            // Left click on mouse-down, like the native arrow (the light
+            // capsule shown while held is macOS's press look). The right-click
+            // menu on mouse-up: opened from inside a mouse-down, the button
+            // keeps waiting for a mouse-up the menu already consumed, and in
+            // that tracking loop AppKit never processes the app's activation,
+            // so Settings opened from the menu stayed unfocused (NOTES §18).
+            button.sendAction(on: [.leftMouseDown, .rightMouseUp])
             (button.cell as? NSButtonCell)?.highlightsBy = []
             (button.cell as? NSButtonCell)?.showsStateBy = []
         }
@@ -80,10 +84,19 @@ final class ShelfController {
 
     @objc private func arrowClicked() {
         clearHighlight()
-        if let event = NSApp.currentEvent,
-           event.type == .rightMouseDown || event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
-            showMenu()
-            return
+        if let event = NSApp.currentEvent {
+            if event.type == .rightMouseUp {
+                showMenu()
+                return
+            }
+            if event.modifierFlags.contains(.control) {
+                // Control-click arrives on mouse-down: open the menu once the
+                // button's tracking has ended (same reason as above).
+                RunLoop.main.perform(inModes: [.default]) { [weak self] in
+                    MainActor.assumeIsolated { self?.showMenu() }
+                }
+                return
+            }
         }
         if model.expired {
             showExpired?()

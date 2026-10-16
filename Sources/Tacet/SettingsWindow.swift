@@ -30,10 +30,7 @@ final class SettingsWindowController {
             window.center()
             let center = NotificationCenter.default
             center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.setRefreshing(false)
-                    AppFocus.windowClosing(window)
-                }
+                MainActor.assumeIsolated { self?.setRefreshing(false) }
             }
             center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateRefreshing() }

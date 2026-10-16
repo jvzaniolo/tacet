@@ -1263,13 +1263,25 @@ unnecessary for users who grant it.
 
 ## 18. Settings focus and the app icon (2026-10-16)
 
-- **Settings opened in front but unfocused.** macOS 14+ activation is
-  cooperative: an agent app (no Dock icon) isn't handed focus by
-  `NSApp.activate()`, and `activate(ignoringOtherApps:)` is ignored. Ice,
-  Thaw and SaneBar (and Bartender, by its behaviour) switch to a regular app
-  while their settings window is open and back to an agent when it closes;
-  Tacet now does the same (Dock icon while Settings is open). Ice also
-  activates the Dock first on the very first activation; not needed so far.
+- **Settings opened in front but unfocused — root cause (found later the
+  same day).** The arrow sent its action on *mouse-down* for both buttons.
+  On a right-click, Tacet opened its menu from inside that mouse-down
+  handler; when the menu closed, the status bar button was still in its
+  mouse-tracking loop, waiting for a mouse-up the menu had already
+  consumed. In that loop AppKit only dequeues mouse events, so the app
+  activation macOS granted (NSWorkspace reported "activated
+  app.gettacet.Tacet", and Tacet was frontmost) was never processed: no
+  `didBecomeActive`, the window never key, until the user's next click
+  elsewhere. **Fix:** the right-click menu opens on *mouse-up*
+  (`sendAction(on: [.leftMouseDown, .rightMouseUp])`; a control-click opens
+  it once tracking ends). With that, a plain `NSApp.activate()` +
+  `makeKeyAndOrderFront` works, with no Dock icon.
+  - Dead ends tried first, all removed: switching to a regular app (Dock
+    icon) while Settings is open, activating the Dock first (Ice's trick),
+    `activate(from:)`, a LaunchServices self-reopen, the deprecated
+    `activate(ignoringOtherApps:)`, delays. They worked from a test hook
+    (no click, so no tracking loop) and failed from the real menu, which is
+    what pointed at the click handling.
 - **App icon:** "Glass" (user's pick of three, `Icon/previews/`). Drawn by
   `Icon/make-icon.swift`, packed by `Icon/make-icns.sh` into
   `Support/Tacet.icns`. Drawn as a pre-masked squircle, macOS 27 put it on a

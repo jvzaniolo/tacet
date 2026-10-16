@@ -62,9 +62,6 @@ final class BetaExpiredWindowController {
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.center()
-            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
-                MainActor.assumeIsolated { AppFocus.windowClosing(window) }
-            }
             self.window = window
         }
         if let window { AppFocus.show(window) }

@@ -13,16 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.write("Tacet \(BuildInfo.shortVersion) (\(BuildInfo.build)) starting on macOS \(BuildInfo.macOSVersion)\(Bundle.main.bundlePath.hasPrefix("/Applications/") ? "" : ", outside /Applications")")
         Log.debug("Bundle: \(Bundle.main.bundlePath)")
         Log.write("Switches supported: \(MenuBarSwitches.isSupported)")
-        // The Dock caches app icons by path, and showed the previous icon on
-        // Tacet's tile; set it from the bundle so the tile is always current.
-        if let icon = NSImage(named: "Tacet") { NSApp.applicationIconImage = icon }
         quitCleanlyOnSignals()
-        if Log.isDebug {
-            // Test hook (debug only): open Settings without a click.
-            DistributedNotificationCenter.default().addObserver(forName: Notification.Name("app.gettacet.Tacet.debug.settings"), object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.settings.show() }
-            }
-        }
         if let expiry = BuildInfo.betaExpiry { Log.write("Beta build \(BuildInfo.shortVersion) (\(BuildInfo.build)), expires \(expiry)") }
         model.start()
         shelf.openSettings = { [weak self] in self?.settings.show() }
