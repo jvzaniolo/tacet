@@ -194,27 +194,48 @@ final class ShelfModel {
     }
 
     /// One write. The journal gets the apps being turned off before the
-    /// write, and loses the ones turned on only after it.
+    /// write, and loses the ones turned on only after it (review §4.1):
+    /// - if the journal can't be saved first, nothing is turned off;
+    /// - if the write fails or only partly lands, the switches are read
+    ///   again and the journal follows what actually happened, so an app
+    ///   Tacet switched off is never mistaken for one the user turned off.
     @discardableResult
     private func write(_ changes: [String: Bool]) -> Bool {
         guard !changes.isEmpty else { rebuildRows(); return true }
+        var changes = changes
         let offs = Set(changes.filter { !$0.value }.keys)
-        let ons = Set(changes.filter { $0.value }.keys)
         if !offs.isEmpty {
+            let before = heldOff
             heldOff.formUnion(offs)
-            Journal.save(heldOff)
+            if !Journal.save(heldOff) {
+                // Without a journal entry an off-switch could outlive Tacet.
+                heldOff = before
+                for id in offs { changes[id] = nil }
+                lastError = String(localized: "Tacet couldn’t change the menu bar switches.")
+                Log.write("Write: journal not saved, not hiding \(offs.count) app(s)")
+                if changes.isEmpty { rebuildRows(); return false }
+            }
         }
+        let ons = Set(changes.filter { $0.value }.keys)
         let ok = MenuBarSwitches.setAllowed(changes)
         if ok {
             heldOff.subtract(ons)
-            lastError = nil
-        } else {
-            // Nothing changed: undo the journal entries this write added.
-            heldOff.subtract(offs.filter { switches[$0] == true })
+            for (id, value) in changes { switches[id] = value }
+            if offs.allSatisfy({ changes[$0] != nil }) { lastError = nil }
+        } else if let now = readSwitches() {
+            // Keep exactly the offs that are off, drop the ons that are on.
+            heldOff.subtract(offs.filter { now[$0] != false })
+            heldOff.subtract(ons.filter { now[$0] == true })
+            switches = now
             lastError = String(localized: "Tacet couldn’t change the menu bar switches.")
+            Log.write("Write: failed or partial; journal follows a fresh read")
+        } else {
+            // Can't tell what happened: keep every off in the journal, so a
+            // later read or Quit turns them back on rather than losing them.
+            lastError = String(localized: "Tacet couldn’t change the menu bar switches.")
+            Log.write("Write: failed and switches unreadable; journal kept as is")
         }
         Journal.save(heldOff)
-        for (id, value) in changes where ok { switches[id] = value }
         rebuildRows()
         return ok
     }
@@ -232,10 +253,17 @@ enum Journal {
         return Set(ids)
     }
 
-    static func save(_ ids: Set<String>) {
+    @discardableResult
+    static func save(_ ids: Set<String>) -> Bool {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let dict: NSDictionary = ["heldOff": ids.sorted(), "updated": Date()]
-        guard let data = try? PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0) else { return }
-        do { try data.write(to: url, options: .atomic) } catch { Log.write("Journal: can't save (\(error.localizedDescription))") }
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0) else { return false }
+        do {
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            Log.write("Journal: can't save (\(error.localizedDescription))")
+            return false
+        }
     }
 }
