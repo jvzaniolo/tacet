@@ -30,7 +30,9 @@ final class BarCapture {
     }
 
     /// Refreshes the cached background and arrow glyph (throttled).
-    func refreshIfNeeded(screen: BarReader.ScreenInfo?, arrow: CGRect?, force: Bool = false) {
+    /// `updateArrow: false` keeps the cached » (needed while ours is drawn
+    /// over the real arrow, which a new capture would no longer see).
+    func refreshIfNeeded(screen: BarReader.ScreenInfo?, arrow: CGRect?, force: Bool = false, updateArrow: Bool = true) {
         // A capture can hang (seen once at launch); don't let that block all later ones.
         if capturing, Date().timeIntervalSince(captureStarted) > 5 {
             Log.write("Bar capture: previous capture still pending after 5 s; starting a new one")
@@ -60,7 +62,7 @@ final class BarCapture {
                 background = try await SCScreenshotManager.captureImage(
                     contentFilter: SCContentFilter(display: display, excludingWindows: own), configuration: config)
                 backgroundRectAX = bar.frame
-                if let arrow, let patch = backgroundPatch(for: ArrowCatcher.coverRectAX(for: arrow)),
+                if updateArrow, let arrow, let patch = backgroundPatch(for: ArrowCatcher.coverRectAX(for: arrow)),
                    let cg = patch.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                     expandedArrow = Self.mirrored(cg, size: patch.size)
                 }

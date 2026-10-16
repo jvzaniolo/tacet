@@ -23,12 +23,18 @@ final class CoverWindow {
 
     /// Shows `image` over `rectAX` (AX coordinates). Returns false without an image.
     @discardableResult
-    func show(_ image: NSImage?, over rectAX: CGRect) -> Bool {
+    func show(_ image: NSImage?, over rectAX: CGRect, fadeIn: TimeInterval = 0) -> Bool {
         guard let image else { return false }
         imageView.image = image
         window.setFrame(BarReader.cocoaRect(rectAX), display: true)
-        window.alphaValue = 1
+        window.alphaValue = fadeIn > 0 ? 0 : 1
         window.orderFrontRegardless()
+        if fadeIn > 0 {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = fadeIn
+                window.animator().alphaValue = 1
+            }
+        }
         return true
     }
 

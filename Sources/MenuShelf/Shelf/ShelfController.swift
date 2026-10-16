@@ -196,7 +196,7 @@ final class ShelfController {
         switch phase {
         case .hidden: openPanel()
         case .panel: closePanel()
-        case .revealing: closeRequested = true
+        case .revealing: cancelReveal()
         case .revealed: conceal()
         case .closing: break
         }
@@ -237,6 +237,9 @@ final class ShelfController {
         panel.open(entries: entries(for: hidden), arrow: arrow, boundary: boundary, barTop: barTop,
                    barHeight: barHeight(for: arrow), naturalX: images.order, absoluteX: expectedPositions(of: hidden, arrow: arrow))
         catcher.setOpen(true, cover: barCapture.expandedArrow)
+        // A fresh copy of the bar for the cover, taken while the spring plays
+        // (our windows are excluded from it).
+        barCapture.refreshIfNeeded(screen: barScreen, arrow: arrow, force: true, updateArrow: false)
         catcher.bringToFront()
         phase = .panel
         installPanelMonitors()
@@ -248,6 +251,9 @@ final class ShelfController {
     }
 
     private func closePanel(animated: Bool = true, dismissMenu: Bool = true) {
+        // Past the panel stage the real items are on (or entering) the bar.
+        if phase == .revealing { cancelReveal(); return }
+        if phase == .revealed { conceal(); return }
         if dismissMenu { tracker?.dismiss() }
         endTracking()
         phaseToken += 1
@@ -327,6 +333,28 @@ final class ShelfController {
         }
     }
 
+    /// Close requested before the swap: the real items are still under the
+    /// cover, so send them back and let the panel animate out on top.
+    private func cancelReveal() {
+        guard phase == .revealing else { return }
+        phaseToken += 1
+        let token = phaseToken
+        phase = .closing
+        removeMonitors()
+        spacer.setRevealed(false)
+        panel.close(animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, token == self.phaseToken else { return }
+            self.cover.hide(fade: 0.1)
+            self.catcher.setOpen(false)
+            self.revealedPIDs = []
+            self.revealedKeys = []
+            self.revealBaseline = []
+            self.phase = .hidden
+            self.scheduleRefresh()
+        }
+    }
+
     private func completeReveal(frames: [String: CGFloat], items: [MenuBarItem], since: Date) {
         // Learn where macOS put them, so the next open lands exactly there.
         if let arrow = revealArrow {
@@ -343,8 +371,10 @@ final class ShelfController {
         // These positions were verified settled: the reference for next time.
         images.rememberPositions(frames)
         panel.moveItems(toAX: frames, duration: 0)
-        panel.vanish()
-        cover.hide()
+        // Same icons at the same spots underneath: a quick cross-fade hides
+        // the small rendering differences between our pictures and the bar.
+        panel.handOff(duration: 0.12)
+        cover.hide(fade: 0.12)
         catcher.bringToFront()
         phase = .revealed
         Log.write("Revealed natively in \(Int(Date().timeIntervalSince(since) * 1000)) ms")
@@ -387,7 +417,7 @@ final class ShelfController {
                     return
                 }
                 if let tracker = self.tracker, tracker.contains(cocoaPoint: location) { return }
-                if self.phase == .revealing { self.closeRequested = true; return }
+                if self.phase == .revealing { self.cancelReveal(); return }
                 // The click also dismisses the item's menu by itself.
                 self.closePanel(dismissMenu: false)
             }
@@ -396,7 +426,7 @@ final class ShelfController {
             guard event.keyCode == 53 else { return }
             MainActor.assumeIsolated {
                 guard let self, Date() > MenuTracker.injectingEscapeUntil else { return }
-                if self.phase == .revealing { self.closeRequested = true; return }
+                if self.phase == .revealing { self.cancelReveal(); return }
                 guard self.phase == .panel else { return }
                 // Esc with a menu open belongs to that menu; the panel stays.
                 if let tracker = self.tracker, tracker.isOpen { return }
@@ -528,12 +558,15 @@ final class ShelfController {
             for item in revealed { if let f = item.frame { xs[BarReader.key(for: item)] = f.minX } }
             let arrow = self.revealArrow ?? snap.spacer ?? .zero
             let rect = self.coverRectAX(arrow: arrow)
-            let covered = self.cover.show(self.barCapture.backgroundPatch(for: rect), over: rect)
+            let covered = self.cover.show(self.barCapture.backgroundPatch(for: rect), over: rect, fadeIn: 0.08)
             if covered {
                 self.panel.open(entries: self.entries(for: revealed), arrow: arrow, boundary: self.boundary, barTop: self.barTop,
                                 barHeight: self.barHeight(for: arrow), absoluteX: xs, animated: false)
                 self.catcher.bringToFront()
             }
+            // Let the cover and panel fade in over the real icons first.
+            try? await Task.sleep(for: .milliseconds(covered ? 90 : 0))
+            guard token == self.phaseToken else { return }
             self.spacer.setRevealed(false)
             self.panel.close(animated: covered)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -715,7 +748,7 @@ final class ShelfController {
             refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.logSnapshot() }
         case "open": openPanel(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.logSnapshot() }
-        case "close": phase == .revealed ? conceal() : closePanel()
+        case "close": closePanel()
         case "press":
             let hidden = sortedHidden()
             if let n = parts.dropFirst().first.flatMap(Int.init), hidden.indices.contains(n) { pick(hidden[n]) }
