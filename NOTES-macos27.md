@@ -742,6 +742,11 @@ MBAssessmentModeAssertion      -init
 
 ### Still open
 
+- **Stats stopped drawing** its CPU/RAM widget (AX width 2 pt, an empty slot
+  between items) after many hide/show cycles during the spacer and
+  assertion experiments; relaunching Stats fixed it. Watch whether this
+  recurs with normal use of the restriction. If it does, it may need a
+  per-app workaround or a note.
 - E6: an app launched or relaunched while concealed (KVO path untested).
 - Multi-display with both bars live: hiding is per app, so it applies to
   every display. It's untested with the Dell and MacBook bars side by side.
