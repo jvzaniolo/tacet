@@ -615,3 +615,123 @@ direct download.
   preferences.
 - No Thaw/Ice code is used anywhere. All implementation is original; Thaw
   was only read for mechanisms.
+
+---
+
+## 11. MenuShelf on MenuBarAgent's restriction (2026-10-16)
+
+The user chose to make MenuShelf as native as possible:
+- hide and show with MenuBarAgent's own visibility restriction;
+- let macOS animate the real icons;
+- **no spacer fallback**.
+
+This supersedes §10. The panel, cover, arrow catcher, image cache, spacer,
+Screen Recording request, VisibleCC code and spike tooling are all removed
+(git history keeps them). Background research is in `../research/REPORT.md`
+§3c–§5.
+
+### Provenance and licence
+
+- The shim (`Sources/MenuShelf/MenuBarAssertion.swift`) was written from
+  **class and selector names only**:
+  - Listed from the framework's own Objective-C runtime on this Mac:
+    `dlopen` of `/System/Library/PrivateFrameworks/MenuBarClientCore.framework`,
+    then `class_copyMethodList`.
+  - Cross-checked against public prose: Sowyu's comment in
+    [Thaw discussion #737](https://github.com/thaw-app/Thaw/discussions/737),
+    the Apache-2.0 BarNook/Ellipsis `docs/phase0.md` and `docs/spec.md`
+    (docs only), and the public `AEMenuBarItem.h` header in the macOS 27 SDK.
+- Thaw's PlatformRuntimeKit (binary or anything derived from it) was never
+  downloaded, opened or used.
+- No GPL code (Thaw, Ice) and no other project's code was copied.
+- What the runtime shows on 27.0.1 (26A434):
+
+```
+MBAssessmentModeConfiguration  -initWithAllowedSystemItems:allowedBundleIdentifiers:  (NSArray, NSArray)
+                               -allowedSystemItems / -allowedBundleIdentifiers
+MBAssessmentModeAssertion      -init
+                               -activateWithConfiguration:completionHandler:
+                               -activateWithCompletionHandler:  -activate:completion:
+                               -invalidate
+```
+
+- `allowedSystemItems` takes NSNumber codes. 0–6 follow the public
+  `AEMenuBarItem` constants in header order: Battery, Bluetooth, Clock,
+  Displays, Keyboard, Volume, Wi-Fi. 8 is Control Center (BarNook docs).
+  MenuShelf allows 0–40.
+- **Completion block, observed:** called within 1–26 ms with raw arguments
+  `(0, 3)` on success. The first argument is the NSError pointer (0 = nil);
+  the second is leftover register content. The shim takes raw values and
+  never dereferences them, so a wrong signature can't crash.
+- Not legal advice. Private API: if Apple changes it, MenuShelf stops hiding,
+  and we fix it then. There is deliberately no fallback.
+
+### Experiments (built-in notch display and the Dell U2724DE)
+
+| # | Question | Result |
+| --- | --- | --- |
+| **E7** | Does our own chevron survive the allow-list? | **(b)** "MenuShel Dev"-signed in /Applications: **yes**. **(a)** ad-hoc signed in /Applications: **yes** (confirmed by the user). **(c)** signed but run from the build folder: **no**, our « is hidden although our bundle ID is allowed. → **Location matters, signing doesn't.** `build-app.sh` installs to /Applications. |
+| **E1** | The native animation | **Conceal:** pixels change from ~180 ms to ~760 ms after the call (≈ 0.58 s), then a small settle at ~1 s (Now Playing leaving). **Reveal:** starts ~130 ms after the call, runs ≈ 0.48 s (443 → 921 ms); the hidden icons fade in while our chevron makes room. Activation completes in 1–26 ms; the rest is MenuBarAgent animating. The user sees it as fades ("no sliding"); it "feels native". |
+| **E2** | Swap without a flash | hide{OrbStack, ChatGPT} → hide{OrbStack}. **Activate-then-invalidate:** only ChatGPT's spot changes. **Invalidate-then-activate:** wider change, then a second burst at ~1.27 s as OrbStack reappears and hides again (a flash). MenuShelf always activates first. |
+| **E3** | Menu alignment after reveal | OrbStack menu at x 1208 for its icon at 1220. 1Password popover at 1284 for its icon at 1288. A MenuBarAgent item opened its own panel normally. **Aligned:** these are the real items in their real slots (v1 was ~200 pt off). |
+| **E6** | Granularity, edge cases | Hiding Raycast removes both its items (icon + "Daily" text): per app. The freed space closes up with no native overflow arrow. **Works on the Dell (no notch)**: E1 and E7 were recorded on its bar. Not run: launching a new app or relaunching a hidden app while concealed. The allow-list follows `runningApplications` via KVO, but it's untested. |
+| **E4** | Side effects while something is hidden | User's check. **Works:** Control Center. **Broken:** clicking the clock (no Notification Center); the green camera/mic indicator is missing; the Focus icon and Now Playing ▶ are hidden (▶ also seen disappearing in E1/E6). **No workarounds implemented**: the user decides (options below). |
+
+### How MenuShelf works now
+
+- **`Restriction`**
+  - Holds one assertion and swaps it activate-first.
+  - Retries after 250 ms, 1 s and 4 s on failure.
+  - Re-applies when `NSWorkspace.runningApplications` changes (KVO; launch
+    notifications miss `LSUIElement` apps).
+  - Changes within 0.35 s of the last one are merged into one final state,
+    and nothing is sent if it equals what's already held. Rapid on/off clicks
+    used to stall the bar while MenuBarAgent finished each animation.
+- **Our items**
+  - Chevron: `chevron.backward.2` when concealed, `chevron.forward.2` when
+    open, template image, no pressed capsule (`highlightsBy = []`).
+  - Divider (a 2 pt line): only while editing.
+  - They change in the same run-loop turn as the assertion request.
+- **Edit mode** (first run, or right-click « → Edit Layout…)
+  - No assertion; divider shown. ⌘-drag icons across it.
+  - Done = click the divider or ». Accessibility reads the items once.
+  - **Rule:** an app is hidden only when *all* its items' centres are left of
+    the divider. An app with items on both sides stays visible: we never hide
+    an icon the user put on the visible side.
+  - Item centres are used because some AX frames are much wider than the icon
+    (Claude's is 42 pt) and their right edge overlaps the divider.
+- **Revealed:** an allow-everything assertion. The real icons are on the bar,
+  so clicking between items, menus and popovers is fully native.
+- **Close rules** (as the native overflow):
+  - a click outside the menu bar and outside any menu (layer ≥ pop-up menu)
+    or any new window of a hidden app;
+  - Esc with no such menu open;
+  - a click on ».
+  - No timer. Clicks on the bar itself keep it open.
+- **Permissions:** Accessibility only, and only to read the layout on Done.
+  Hiding needs none. No Screen Recording.
+- **Quit:** invalidating our assertions shows everything again.
+
+### Side-effect options for the user (not implemented)
+
+1. **Accept them.** Document that NC/camera/Focus/Now Playing are unavailable
+   while hidden.
+2. **Clock relay** (BarNook's approach):
+   - on mouse-down over the clock, lift the restriction, replay the click
+     ~10–80 ms later, then re-apply;
+   - NC opens in ~0.4–0.7 s instead of ~0.17 s;
+   - needs Accessibility and a global mouse monitor;
+   - hidden icons flash unless masked.
+3. **Replacement items** (Pelmet, justhide): MenuShelf shows its own camera
+   indicator, Focus and Now Playing items while concealed.
+4. **Auto-reveal** when the camera/mic turns on or media starts playing.
+
+### Still open
+
+- E6: an app launched or relaunched while concealed (KVO path untested).
+- Multi-display with both bars live: hiding is per app, so it applies to
+  every display. It's untested with the Dell and MacBook bars side by side.
+- Opening a hidden item while concealed (search/hotkey): AXPress the parked
+  element first, then reveal-that-app; not built.
+- Release work: Developer ID signing + notarization (install to
+  /Applications), Sparkle, $5 licensing, launch at login, an app icon.

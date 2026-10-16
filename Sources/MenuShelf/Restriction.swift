@@ -46,10 +46,25 @@ final class Restriction {
         }
     }
 
+    /// MenuBarAgent finishes a running hide/show animation (~0.5 s) before it
+    /// takes the next allow-list, so rapid toggles stalled the bar. Changes
+    /// within this window of the last one are merged: only the final state
+    /// is sent, once the window ends (nothing at all if it's unchanged).
+    static let minimumInterval: TimeInterval = 0.35
+    private var lastSent = Date.distantPast
+    private var deferredApply = false
+
     func set(_ mode: Mode) {
         self.mode = mode
         retry = 0
-        apply()
+        let wait = Self.minimumInterval - Date().timeIntervalSince(lastSent)
+        guard wait > 0 else { apply(); return }
+        guard !deferredApply else { return }
+        deferredApply = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+            self?.deferredApply = false
+            self?.apply()
+        }
     }
 
     private func apply() {
@@ -67,6 +82,7 @@ final class Restriction {
         }
         pending?.invalidate()
         pending = assertion
+        lastSent = Date()
         let started = Date()
         let mode = self.mode
         assertion.activate { [weak self] a, b in
