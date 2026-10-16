@@ -1176,3 +1176,6 @@ a link to System Settings, never a switch, so they can't be mistaken for
   swapped for a static frame: a TimelineView kept waking up (~3–4 % CPU) even
   after its schedule ran out. Idle CPU with Settings open is now ~0 % apart
   from the 1 s switch refresh.
+- **Caption (user):** only "Hold ⌘ and drag the » arrow to the right of the
+  apps you hide." (en/pt-BR/es). The play button is disabled while the
+  animation plays.

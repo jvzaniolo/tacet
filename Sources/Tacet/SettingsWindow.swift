@@ -270,11 +270,12 @@ private struct ArrowPlacementSection: View {
                             .font(.system(size: 18))
                     }
                     .buttonStyle(.borderless)
+                    .disabled(ui.animationStart != nil)   // playing
                     .help(Text("Play Animation"))
                     .accessibilityLabel(Text("Play Animation"))
                     .padding(.top, 6)
                 }
-                Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps.")
+                Text("Hold ⌘ and drag the » arrow to the right of the apps you hide.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -350,7 +351,7 @@ struct DragAnimation: View {
             if !Task.isCancelled { onFinished(start) }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps."))
+        .accessibilityLabel(Text("Hold ⌘ and drag the » arrow to the right of the apps you hide."))
     }
 
     private func bar(move: CGFloat, pointer: Double, held: Bool) -> some View {

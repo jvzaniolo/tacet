@@ -38,7 +38,7 @@
 /* Arrow Position */
 "Arrow Position" = "Posição da Seta";
 "Play Animation" = "Reproduzir Animação";
-"Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Clique em « e mantenha ⌘ pressionado para arrastar a seta para a direita dos apps ocultos.";
+"Hold ⌘ and drag the » arrow to the right of the apps you hide." = "Mantenha ⌘ pressionado e arraste a seta » para a direita dos apps que você oculta.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Mostrar Itens Ocultos da Barra de Menus";
