@@ -16,10 +16,9 @@ cp "$BIN" "$APP/Contents/MacOS/MenuShelf"
 cp Support/Info.plist "$APP/Contents/Info.plist"
 
 # Sign with the "MenuShelf Dev" certificate when it exists (self-signed is
-# fine): macOS then keeps the Accessibility and Screen Recording grants across
-# rebuilds. Otherwise sign ad hoc, and TCC ties grants to this exact binary,
-# so you must re-enable MenuShelf in System Settings after every rebuild.
-# No hardened runtime and no sandbox: MenuShelf uses Accessibility.
+# fine): a stable identity keeps macOS grants across rebuilds. Otherwise sign
+# ad hoc. MenuShelf needs no TCC permission; its one grant is the
+# security-scoped bookmark to the Control Center settings file.
 # A self-signed certificate is "not trusted", so `find-identity -v` hides
 # it; list without -v. Any identity whose name starts with "MenuShel"
 # matches (covers "MenuShelf Dev" and a "MenuShel Dev" typo).
@@ -35,9 +34,9 @@ fi
 
 echo "Built $PWD/$APP"
 
-# MenuBarAgent's restriction only treats apps in /Applications as normal
-# apps: run from anywhere else, MenuShelf's own items get hidden too.
-# INSTALL=0 skips this step.
+# Installs to /Applications, where a shipping app lives. Since the switch to
+# the System Settings switches (NOTES §13) nothing requires it any more; the
+# old restriction did (§11 E7). INSTALL=0 skips this step.
 if [ "${INSTALL:-1}" = "1" ]; then
     DEST="/Applications/MenuShelf.app"
     osascript -e 'quit app id "dev.menushelf.MenuShelf"' >/dev/null 2>&1 || true

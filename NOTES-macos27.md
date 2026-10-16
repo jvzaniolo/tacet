@@ -891,3 +891,114 @@ removed. Costs to handle:
 All switches touched were restored and verified. The 11 apps were all
 allowed before and after; the user turned the two they toggled by hand back
 on.
+
+## 13. MenuShelf on the "Allow in the Menu Bar" switches (2026-10-16)
+
+The user approved rebuilding hiding on the switches (§12 recommendation).
+This supersedes §11: the restriction (`MenuBarAssertion`, `Restriction`), the
+divider, edit mode / ⌘-drag configuration, the Accessibility request, the AX
+enumeration and the `--debug` commands are removed (git history keeps them).
+
+### Design
+
+- **Settings window** with a list in the style of System Settings › Menu Bar ›
+  "Allow in the Menu Bar": app icon, name, a switch. One row per app in
+  `trackedApplications` (MenuShelf itself excluded). macOS only hides whole
+  apps, so the choice is per app.
+- **Three states per app.** MenuShelf keeps its own list of hidden apps, so
+  it never confuses them with apps the user turned off in macOS:
+  - **Visible:** switch on; MenuShelf leaves it alone.
+  - **Hidden:** off at rest, on while revealed.
+  - **Off in System Settings:** turned off outside MenuShelf. Shown in its own
+    section with "Open Menu Bar Settings…"
+    (`x-apple.systempreferences:com.apple.ControlCenter-Settings.extension`).
+    « never turns it on.
+- **Reconcile before every write** (fresh read via cfprefsd):
+  - an app MenuShelf held off that is now on → the user turned it on → Visible;
+  - a hidden app that is off although MenuShelf didn't turn it off → the
+    user turned it off → Off in System Settings.
+- **Status item:** one arrow (`chevron.backward.2` concealed /
+  `chevron.forward.2` revealed, no capsule). Click toggles: one batched write
+  of all hidden apps. With nothing hidden (or no access) a click opens
+  Settings. Right-click: Settings…, Show All (revealed, ignores the close
+  rules until clicked again), Quit.
+- **Close rules** as before: click outside the bar and menus, or Esc with no
+  menu open. Esc needs a global key monitor, which macOS only delivers to apps
+  trusted for Accessibility; MenuShelf no longer asks for it, so Esc works only
+  where it was granted anyway.
+- **Live list:** there's no change notification for these preferences, so
+  while the Settings window is open MenuShelf re-reads every second (new apps,
+  changes made in System Settings). Footer: "Apps appear here after their
+  first time in the menu bar."
+
+### Safety
+
+- **Quit** (menu, `kill`/SIGTERM, SIGINT, SIGHUP, logout) turns every app
+  MenuShelf switched off back on.
+- **Journal** `~/Library/Application Support/MenuShelf/journal.plist`
+  (`heldOff`): the apps MenuShelf has switched off. It gains the apps being
+  turned off *before* the write and loses the ones turned on only *after* it
+  succeeds, so it always covers every switch that might be MenuShelf's.
+- **Launch recovery** when the journal isn't empty (crash, `kill -9`, power
+  loss): switches still off are adopted (they're concealed, which is where
+  MenuShelf starts, so nothing flashes); switches someone turned back on are
+  dropped from the journal; held-off apps no longer hidden are turned on.
+- **Onboarding** explains the switches, that hidden apps show as off in
+  System Settings and can be turned on there, and that quitting restores them
+  (quit before deleting).
+- Each write reads back the value; a write that didn't stick is reported in
+  the Settings window and the journal entries it added are dropped.
+
+### Is the file grant needed? Yes, for both read and write
+
+Probe: a separate ad-hoc app (`dev.menushelf.probe`, fresh TCC identity,
+launched with `open` so it is its own responsible process), no bookmark, no
+Full Disk Access:
+
+| Operation | Without grant | With grant (MenuShelf) |
+| --- | --- | --- |
+| Open the plist directly | Refused (EPERM) | OK |
+| `_CFPreferencesCopyAppValueWithContainer` (after Synchronize) | **nil** | OK |
+| `_CFPreferencesSetAppValueWithContainer` of a harmless test key + Synchronize | Synchronize returns **false**; only the in-process cache holds the value, a fresh process doesn't see it | `synced true`, read back OK |
+
+cfprefsd does not access the group container on the client's behalf: it
+enforces the same group-container protection. So the open-panel grant (or
+Full Disk Access) is required for reading **and** writing, and stays in
+onboarding. No "access data from other apps" prompt was reported.
+
+The bookmark: it survives relaunches. On one relaunch it came back **stale**
+(probably because cfprefsd replaces the file when it saves it); MenuShelf
+re-creates the bookmark data then and access keeps working. If it no longer
+resolves or the file won't open, the Settings window returns to the access step
+with a "lost access" note (hidden apps may still be off; grant again, or turn
+them on in System Settings).
+
+### /Applications
+
+No longer required: the restriction treated non-/Applications apps
+differently (§11 E7); the switches don't. `scripts/build-app.sh` still
+installs there, as a shipping app would live there.
+
+### Hand test with the user (MacBook notch display, 27.0.1)
+
+| Check | Result |
+| --- | --- |
+| Onboarding → Grant Access (open panel on the plist) → Choose Apps | ✅ |
+| Hide/reveal 5 apps (1Password, Claude, ChatGPT, OrbStack, CleanShot), one write each | ✅ "perfect"; each write `synced true, verified true` |
+| Switching between revealed apps' menus | ✅ |
+| Clock → Notification Center while hidden | ✅ |
+| Camera/mic indicator while hidden | ✅ |
+| Focus while hidden | ✅ |
+| App turned off in System Settings (Stats) not brought back by « ; listed as "Turned Off in System Settings" | ✅ |
+| Quit from the menu restores all 5, journal empty | ✅ |
+| Relaunch: hides again, no new grant needed | ✅ |
+| `kill -9` while hidden: apps stay off, journal lists all 5 | ✅ (expected) |
+| Relaunch after the crash: all 5 adopted, nothing flashes, « / » work | ✅ |
+| SIGTERM: restores all 5, journal empty | ✅ |
+
+### Open: the native overflow arrow
+
+On the notch display with a wide app menu (Chrome), the revealed apps don't
+fit, so MenuBarAgent shows its own overflow arrow next to ours: two »
+arrows. The user wants MenuShelf to manage that instead (no native arrow;
+the extra icons go left of the notch). Under investigation.

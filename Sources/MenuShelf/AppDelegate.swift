@@ -2,26 +2,44 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let shelf = ShelfController()
-    private var onboarding: OnboardingController!
+    private let model = ShelfModel()
+    private lazy var shelf = ShelfController(model: model)
+    private lazy var settings = SettingsWindowController(model: model)
+    private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("MenuShelf starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString) from \(Bundle.main.bundlePath)")
-        Log.write("Assertion API available: \(Restriction.isAvailable); Accessibility: \(AX.isTrusted(prompt: false))")
-        onboarding = OnboardingController { Log.write("Accessibility granted") }
-        shelf.openPermissions = { [weak self] in self?.onboarding.show() }
+        Log.write("Switches supported: \(MenuBarSwitches.isSupported)")
+        quitCleanlyOnSignals()
+        model.start()
+        shelf.openSettings = { [weak self] in self?.settings.show() }
         shelf.start()
-        // Accessibility is needed only to read the layout when you finish
-        // editing, so ask for it up front only on first run.
-        if !UserDefaults.standard.bool(forKey: "didEditLayoutOnce") { onboarding.showIfNeeded() }
+        if settings.needsWelcome { settings.show() }
     }
 
+    /// Restores the switches on quit, including at logout and shutdown.
     func applicationWillTerminate(_ notification: Notification) {
         shelf.prepareForTermination()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        onboarding.show()
+        settings.show()
         return true
+    }
+
+    /// `kill`, `killall` and Ctrl-C go through the normal quit, so hidden
+    /// apps are turned back on. (SIGKILL can't be caught: the journal covers
+    /// it on the next launch.)
+    private func quitCleanlyOnSignals() {
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler {
+                Log.write("Signal \(sig): quitting")
+                NSApp.terminate(nil)
+            }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 }

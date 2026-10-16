@@ -1,221 +1,111 @@
 import AppKit
 
-/// MenuShelf: hides apps' menu bar items with MenuBarAgent's own restriction,
-/// so macOS animates the real icons (NOTES §11).
+/// MenuShelf's one status item, an arrow like the native overflow one:
+/// « when hidden apps are hidden, » while they're shown (NOTES §13).
 ///
-///     notch | [hidden apps …] | »  [visible items …]  Clock
-///                             ^ ^
-///                       divider chevron (ours; divider only while editing)
-///
-/// - Concealed: an assertion allows every running app except the hidden set.
-/// - Revealed: an assertion allows everything (swapped in without a gap).
-///   The real icons are on the bar, so menus and switching are native.
-/// - Editing: no assertion, divider shown; ⌘-drag icons across it. On Done the
-///   hidden set = apps whose items are all left of the divider.
+/// Clicking it flips the "Allow in the Menu Bar" switches of the hidden apps
+/// in one write; macOS hides, shows and animates the real icons.
 @MainActor
 final class ShelfController {
-    enum State { case concealed, revealed, editing }
-
-    private let restriction = Restriction()
-    private let chevron = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let divider = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private(set) var state: State = .concealed
+    let model: ShelfModel
+    private let arrow = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var mouseMonitor: Any?
     private var keyMonitor: Any?
+    /// Show All: stays revealed until the arrow is clicked.
+    private var pinned = false
     /// Windows the hidden apps had on screen when revealed; newer ones are
     /// their menus or popovers.
     private var revealBaseline: Set<CGWindowID> = []
 
-    var openPermissions: (() -> Void)?
+    var openSettings: (() -> Void)?
 
-    private static let hiddenKey = "hiddenBundleIDs.v2"
-
-    var hidden: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? []) }
-        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: Self.hiddenKey) }
+    init(model: ShelfModel) {
+        self.model = model
     }
 
     func start() {
-        // Created right-to-left: the chevron first, so the divider sits left of it.
-        chevron.autosaveName = "MenuShelfChevron"
-        divider.autosaveName = "MenuShelfDivider"
-        for item in [chevron, divider] {
-            guard let button = item.button else { continue }
+        arrow.autosaveName = "MenuShelfChevron"
+        if let button = arrow.button {
             button.target = self
-            // Act on mouse-down for an instant response. The light capsule
-            // shown while the button is held is macOS's normal press look
-            // and goes away on release.
+            button.action = #selector(arrowClicked)
+            // Mouse-down, like the native arrow. The light capsule shown
+            // while the button is held is macOS's press look.
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
-            // No pressed capsule: the native overflow arrow has none.
             (button.cell as? NSButtonCell)?.highlightsBy = []
             (button.cell as? NSButtonCell)?.showsStateBy = []
         }
-        chevron.button?.action = #selector(chevronClicked)
-        divider.button?.action = #selector(dividerClicked)
-        divider.button?.toolTip = "MenuShelf divider — ⌘-drag icons to its left to hide them, then click here"
-
-        restriction.onApplied = { mode, ms in
-            Log.write("Applied \(Restriction.describe(mode)) after \(Int(ms * 1000)) ms")
-        }
-        if CommandLine.arguments.contains("--debug") { DebugCommands.install(shelf: self) }
-
-        guard Restriction.isAvailable else {
-            Log.write("MenuBarClientCore assertion API not found; MenuShelf can't hide on this macOS")
-            render()
-            return
-        }
-        if hidden.isEmpty && !UserDefaults.standard.bool(forKey: "didEditLayoutOnce") {
-            beginEditing()
-        } else {
-            conceal()
-        }
+        render()
+        conceal()
     }
 
     // MARK: States
 
-    /// Our items and the assertion change in the same run-loop turn, so
-    /// MenuBarAgent lays the bar out in one pass.
-    /// `--no-hide` (investigations): never restrict anything, so tests of
-    /// other mechanisms aren't disturbed.
-    static let noHide = CommandLine.arguments.contains("--no-hide")
-
     func conceal() {
-        guard !Self.noHide else { restriction.set(.off); return }
-        state = .concealed
+        pinned = false
         removeMonitors()
+        model.conceal()
         render()
-        restriction.set(hidden.isEmpty ? .off : .hiding(hidden))
     }
 
-    func reveal() {
-        guard !Self.noHide else { restriction.set(.off); return }
-        state = .revealed
-        render()
+    func reveal(pinned: Bool = false) {
+        self.pinned = pinned
         revealBaseline = Set(hiddenPIDs().flatMap { MenuTracker.windows(of: $0).map(\.id) })
-        restriction.set(.showingAll)
-        installMonitors()
-    }
-
-    func beginEditing() {
-        state = .editing
-        removeMonitors()
+        model.reveal()
         render()
-        restriction.set(.off)
+        if pinned { removeMonitors() } else { installMonitors() }
     }
-
-    /// Done: the apps whose items are all left of the divider become hidden.
-    func finishEditing() {
-        guard state == .editing else { return }
-        guard AX.isTrusted(prompt: false) else {
-            Log.write("Done: Accessibility is off; can't read the layout")
-            openPermissions?()
-            return
-        }
-        UserDefaults.standard.set(true, forKey: "didEditLayoutOnce")
-        Task { @MainActor in
-            let scan = await Task.detached { MenuBarEnumerator.enumerate(includeOwn: true) }.value
-            let own = ProcessInfo.processInfo.processIdentifier
-            let ownItems = scan.apps.filter { $0.pid == own }.flatMap(\.items).compactMap(\.frame)
-            // Our divider is the leftmost of our two items.
-            guard let dividerX = ownItems.map(\.minX).min() else {
-                Log.write("Done: couldn't find the divider in AX")
-                return
-            }
-            // An item is left of the divider when its centre is: AX frames
-            // include padding, and some (Claude's) are much wider than the
-            // icon, so their right edge can overlap the divider.
-            var newHidden = Set<String>()
-            var decisions: [String] = []
-            for app in scan.apps where app.pid != own {
-                guard let bundleID = app.bundleID, !bundleID.hasPrefix("com.apple.") else { continue }
-                let mids = app.items.compactMap { $0.frame?.midX }
-                let left = mids.filter { $0 < dividerX }.count
-                let hide = !mids.isEmpty && left == mids.count
-                if hide { newHidden.insert(bundleID) }
-                decisions.append("\(bundleID) \(left)/\(mids.count) left → \(hide ? "hide" : "keep")")
-            }
-            Log.write("Done: divider at x \(Int(dividerX)); " + decisions.joined(separator: "; "))
-            hidden = newHidden
-            Log.write("Done: hidden = \(newHidden.sorted())")
-            conceal()
-        }
-    }
-
-    // MARK: Our items
 
     private func render() {
-        let open = state != .concealed
+        let open = model.revealed
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         let name = open ? "chevron.forward.2" : "chevron.backward.2"
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: open ? "Hide Menu Bar Items" : "Show Hidden Menu Bar Items")?
-            .withSymbolConfiguration(config)
+        let title = open ? "Hide Menu Bar Apps" : "Show Hidden Menu Bar Apps"
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: title)?.withSymbolConfiguration(config)
         image?.isTemplate = true
-        chevron.button?.image = image
-        chevron.button?.toolTip = open ? "Hide Menu Bar Items" : "Show Hidden Menu Bar Items"
-        chevron.isVisible = true
-
-        if state == .editing {
-            let bar = NSImage(size: NSSize(width: 6, height: 18), flipped: false) { rect in
-                NSColor.labelColor.setFill()
-                NSBezierPath(roundedRect: NSRect(x: 2, y: 1, width: 2, height: 16), xRadius: 1, yRadius: 1).fill()
-                return true
-            }
-            bar.isTemplate = true
-            divider.button?.image = bar
-            divider.isVisible = true
-        } else {
-            divider.isVisible = false
-        }
+        arrow.button?.image = image
+        arrow.button?.toolTip = title
     }
 
-    /// The native overflow arrow shows no pressed capsule; on macOS 27
-    /// `highlightsBy = []` alone doesn't stop it, so also clear the
-    /// highlight as soon as the click arrives and again after the layout pass.
-    private func clearHighlight(_ item: NSStatusItem) {
-        item.button?.highlight(false)
-        item.button?.isHighlighted = false
-        DispatchQueue.main.async { item.button?.highlight(false) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { item.button?.highlight(false) }
+    /// The native arrow shows no pressed capsule; `highlightsBy = []` alone
+    /// doesn't stop it on macOS 27, so clear it now and after the layout pass.
+    private func clearHighlight() {
+        arrow.button?.highlight(false)
+        DispatchQueue.main.async { self.arrow.button?.highlight(false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.arrow.button?.highlight(false) }
     }
 
-    @objc private func chevronClicked() {
-        clearHighlight(chevron)
-        if let event = NSApp.currentEvent, event.type == .rightMouseUp || event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
+    @objc private func arrowClicked() {
+        clearHighlight()
+        if let event = NSApp.currentEvent,
+           event.type == .rightMouseDown || event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
             showMenu()
             return
         }
-        switch state {
-        case .concealed: reveal()
-        case .revealed: conceal()
-        case .editing: finishEditing()
+        // Nothing to show yet (no access, or no hidden apps): open Settings.
+        guard model.access == .granted, model.hasHiddenApps || model.revealed else {
+            openSettings?()
+            return
         }
-    }
-
-    @objc private func dividerClicked() {
-        clearHighlight(divider)
-        if state == .editing { finishEditing() }
+        if model.revealed { conceal() } else { reveal() }
     }
 
     private func showMenu() {
         let menu = NSMenu()
-        if state == .editing {
-            menu.addItem(withTitle: "Done Editing", action: #selector(menuDone), keyEquivalent: "").target = self
-        } else {
-            menu.addItem(withTitle: "Edit Layout…", action: #selector(menuEdit), keyEquivalent: "").target = self
-        }
+        menu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
+        let showAll = menu.addItem(withTitle: "Show All", action: #selector(menuShowAll), keyEquivalent: "")
+        showAll.target = self
+        showAll.state = pinned ? .on : .off
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Permissions…", action: #selector(menuPermissions), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit MenuShelf", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        chevron.menu = menu
-        chevron.button?.performClick(nil)
-        chevron.menu = nil
+        arrow.menu = menu
+        arrow.button?.performClick(nil)
+        arrow.menu = nil
     }
 
-    @objc private func menuEdit() { beginEditing() }
-    @objc private func menuDone() { finishEditing() }
-    @objc private func menuPermissions() { openPermissions?() }
+    @objc private func menuSettings() { openSettings?() }
+    @objc private func menuShowAll() { if pinned { conceal() } else { reveal(pinned: true) } }
 
-    // MARK: Close rules (native overflow, NOTES §8)
+    // MARK: Close rules (like the native overflow arrow)
 
     /// While revealed: a click outside the menu bar and outside any menu or
     /// popover of the revealed apps conceals; so does Esc with no menu open.
@@ -225,15 +115,18 @@ final class ShelfController {
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                guard let self, self.state == .revealed else { return }
+                guard let self, self.model.revealed, !self.pinned else { return }
                 if Self.isInMenuBar(location) || self.isInMenu(location) { return }
                 self.conceal()
             }
         }
+        // macOS delivers global key events only to apps the user trusted
+        // for Accessibility. MenuShelf doesn't ask for it, so Esc works only
+        // where it was granted anyway.
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
             MainActor.assumeIsolated {
-                guard let self, self.state == .revealed, !self.isAnyMenuOpen() else { return }
+                guard let self, self.model.revealed, !self.pinned, !self.isAnyMenuOpen() else { return }
                 self.conceal()
             }
         }
@@ -255,7 +148,10 @@ final class ShelfController {
     }
 
     private func hiddenPIDs() -> [pid_t] {
-        NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier.map(hidden.contains) ?? false }.map(\.processIdentifier)
+        let hidden = model.hidden
+        return NSWorkspace.shared.runningApplications
+            .filter { $0.bundleIdentifier.map(hidden.contains) ?? false }
+            .map(\.processIdentifier)
     }
 
     /// Menus (any app) and windows the revealed apps opened since revealing.
@@ -266,20 +162,16 @@ final class ShelfController {
     }
 
     private func isInMenu(_ point: NSPoint) -> Bool {
-        let ax = CGPoint(x: point.x, y: (NSScreen.screens.first?.frame.height ?? 0) - point.y)
-        return menuWindows().contains { $0.bounds.insetBy(dx: -2, dy: -2).contains(ax) }
+        let flipped = CGPoint(x: point.x, y: (NSScreen.screens.first?.frame.height ?? 0) - point.y)
+        return menuWindows().contains { $0.bounds.insetBy(dx: -2, dy: -2).contains(flipped) }
     }
 
     private func isAnyMenuOpen() -> Bool { !menuWindows().isEmpty }
 
+    /// Quit: every app MenuShelf switched off is turned back on.
     func prepareForTermination() {
         removeMonitors()
-        // Quitting ends our assertions, which shows everything again.
-        restriction.releaseAll()
+        let ok = model.restoreAll()
+        Log.write("Quit: restored hidden apps (\(ok ? "ok" : "failed"))")
     }
-
-    // MARK: Debug access
-
-    var restrictionForDebug: Restriction { restriction }
-    var chevronForDebug: NSStatusItem { chevron }
 }

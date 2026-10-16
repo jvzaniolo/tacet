@@ -28,7 +28,8 @@ The script:
 - signs it (see Permissions);
 - quits a running MenuShelf and installs the app to `/Applications`.
 
-MenuShelf must run from `/Applications` (see How it works). Use
+Running from `/Applications` is no longer required (it was for the old
+restriction), but it is where the app lives. Use
 `CONFIG=debug ./scripts/build-app.sh` for a debug build, and `INSTALL=0` to
 skip installing.
 
@@ -43,49 +44,43 @@ Output also goes to `~/Library/Logs/MenuShelf.log` and the unified log
 
 ## How it works
 
-MenuShelf uses MenuBarAgent's own visibility restriction (a private macOS 27
-API), so **macOS hides, shows and animates the real icons**. Details,
-provenance and measurements: [NOTES-macos27.md](NOTES-macos27.md) §11.
+MenuShelf hides apps with the **"Allow in the Menu Bar" switches** of System
+Settings › Menu Bar. macOS does the hiding and the animation, so Notification
+Center, Focus, the camera/mic indicator and Now Playing keep working. Details
+and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
 
-- **Configure:** on first run, or right-click « → **Edit Layout…**,
-  everything is shown with a thin divider next to MenuShelf's ». ⌘-drag the
-  icons you want hidden to the left of the divider, then click the divider
-  (or ») to finish.
-- **Per app:** hiding works per app. An app is hidden only when *all* of its
-  icons are left of the divider.
-- **Show / hide:** click « to show the hidden icons in their real places
-  (menus open under them, as usual). Click » to hide them again, or click
-  anywhere outside the menu bar, or press Esc with no menu open.
-- **While anything is hidden, macOS also hides:** Focus, the camera/mic
-  indicator and Now Playing. Clicking the clock doesn't open Notification
-  Center. Control Center works.
-- **Must run from /Applications.** Elsewhere, macOS hides MenuShelf's own
-  items too. `scripts/build-app.sh` installs it there.
-- **No fallback:** if a macOS update removes the API, MenuShelf logs it and
-  stops hiding.
-
-### Debugging
-
-Launch with `--debug` to accept commands from `scripts/debug.swift`. Build it
-with `swiftc -o build/debug scripts/debug.swift`, then for example:
-`build/debug state`, `build/debug hide com.example.app`,
-`build/debug record name 1`. Never enable this in a normal launch: any local
-process could send commands.
+- **Choose apps:** right-click the arrow › **Settings…**. Every app macOS lists
+  under "Allow in the Menu Bar" has a switch; switch an app off to hide it.
+  Apps appear after their first time in the menu bar.
+- **Show / hide:** click « to show the hidden apps in their real places (menus
+  open under them, as usual). Click », anywhere outside the menu bar, or Esc
+  with no menu open (Esc only if MenuShelf has Accessibility, which it doesn't
+  ask for) to hide them again. Right-click › **Show All** keeps them shown.
+- **Three states:** Visible, Hidden (by MenuShelf), and Off in System Settings
+  (turned off outside MenuShelf: listed, never turned on by «). Changes made in
+  System Settings are respected: turning a hidden app on there makes it
+  Visible, turning a hidden app off there makes it Off in System Settings.
+- **Hidden apps show as off in System Settings.** If anything goes wrong,
+  turn them back on there.
+- **Quitting restores:** Quit (or `kill`, logout) turns every app MenuShelf hid
+  back on. Quit MenuShelf before deleting it. After a crash, the journal
+  (`~/Library/Application Support/MenuShelf/journal.plist`) lets the next
+  launch pick the hidden apps up again.
+- **Speed tip (optional):** ⌘-drag your hidden apps to the left end of the
+  menu bar. Then they fade in and out quickly (~0.15 s); elsewhere the icons
+  next to them slide over (~0.45 s).
 
 ## Permissions
 
-| Permission | Needed for | How |
+| Grant | Needed for | How |
 | --- | --- | --- |
-| Accessibility | Reading where icons are when you finish editing | Asked on first run. The Permissions window opens System Settings → Privacy & Security → Accessibility; you turn MenuShelf on there. Hiding itself needs no permission. |
+| Access to `group.com.apple.controlcenter.plist` | Reading and changing the switches (both need it: cfprefsd enforces the group-container protection, NOTES §13) | One-time open panel in onboarding; MenuShelf keeps a security-scoped bookmark. Full Disk Access would also work. |
 
-MenuShelf never changes System Settings itself.
+No TCC permission (Accessibility, Screen Recording) is needed. MenuShelf never
+changes System Settings itself beyond the switches of the apps you hide.
 
-**Keep permissions across rebuilds:** create a self-signed code-signing
-certificate (Keychain Access → Certificate Assistant → Create a Certificate…,
-type Code Signing) named `MenuShelf Dev`. The build script picks up any
-identity whose name starts with "MenuShel", or the one in `SIGN_IDENTITY`.
-Without one the build is signed ad hoc, and macOS drops the Accessibility
-grant on every rebuild.
+**Signing:** the build script signs with any code-signing identity whose name
+starts with "MenuShel" (or `SIGN_IDENTITY`), else ad hoc.
 
 ## Layout
 
@@ -93,16 +88,12 @@ grant on every rebuild.
 Package.swift                 SwiftPM package, one executable target
 Support/Info.plist            Bundle Info.plist (LSUIElement, bundle ID)
 scripts/build-app.sh          Builds, signs and installs to /Applications
-scripts/debug.swift           Sends --debug commands to a running MenuShelf
 Sources/MenuShelf/
-  main.swift, AppDelegate.swift
-  MenuBarAssertion.swift      Shim over MenuBarAgent's restriction (private API)
-  Restriction.swift           Keeps one assertion alive; gapless swaps, retries
-  ShelfController.swift       Chevron + divider items, edit mode, close rules
-  MenuTracker.swift           On-screen windows (menus/popovers) via CGWindowList
-  MenuBarEnumerator.swift     Menu bar items per app via Accessibility (on Done)
-  AX.swift                    Accessibility helpers
-  Onboarding.swift            Accessibility permission window
-  DebugCommands.swift         --debug commands and a 60 fps bar recorder
+  main.swift, AppDelegate.swift   Launch, quit-time restore, signal handling
+  MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
+  ShelfModel.swift            Hidden apps, three states, reconcile, journal
+  ShelfController.swift       The arrow, its menu and the close rules
+  SettingsWindow.swift        Welcome/access step and the app list (SwiftUI)
+  MenuTracker.swift           On-screen menus/popovers via CGWindowList
   Log.swift                   Console / unified log / ~/Library/Logs output
 ```
