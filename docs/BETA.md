@@ -68,8 +68,9 @@ All betas must use this identity: macOS ties the file grant to it.
    FEEDBACK_URL="https://gettacet.com/feedback" scripts/make-beta-dmg.sh
    ```
 
-3. Publish it on GitHub Releases. Proposed: a public repo with binaries
-   only, no source, e.g. `jvzaniolo/tacet-beta` (not created yet):
+3. Publish it on GitHub Releases in the public, binaries-only repo
+   [jvzaniolo/tacet-beta](https://github.com/jvzaniolo/tacet-beta) (its
+   README is the tester guide; feedback goes to its issues):
 
    ```bash
    gh release create v0.1.0-beta.1 build/Tacet-0.1.0-beta.dmg \
@@ -77,8 +78,9 @@ All betas must use this identity: macOS ties the file grant to it.
      --title "Tacet 0.1.0 beta 1" --notes "What changed…"
    ```
 
-   Testers get the link to the latest release:
-   `https://github.com/jvzaniolo/tacet-beta/releases/latest`.
+   Testers get `https://github.com/jvzaniolo/tacet-beta/releases`
+   (`/releases/latest` skips prereleases). First release: v0.1.0-beta.1,
+   2026-10-16, expires 2026-12-15.
 
 To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/build-app.sh`.
 

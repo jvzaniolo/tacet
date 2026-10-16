@@ -1309,8 +1309,11 @@ No Apple account, no cost. Details for testers and the release steps:
   (Tacet.app + `/Applications` link, DMG signed too). Gatekeeper:
   `spctl` rejects the app (origin "Tacet Beta"), as expected without
   notarization: testers use Open Anyway or `xattr -dr com.apple.quarantine`.
-- **Distribution (proposed, not created):** public binaries-only repo
-  `jvzaniolo/tacet-beta` with GitHub Releases (`gh release create … --prerelease`).
+- **Distribution:** public binaries-only repo `jvzaniolo/tacet-beta`
+  (README = tester guide en/pt-BR, issues for feedback while the feedback URL
+  is a placeholder). v0.1.0-beta.1 published as a prerelease on 2026-10-16
+  (expires 2026-12-15). Link testers to `/releases`: `/releases/latest`
+  skips prereleases.
 - **Sparkle:** compatible in principle (EdDSA-signed updates, same
   code-signing identity, update not quarantined) but not added: a
   third-party framework to embed and sign without Xcode, an EdDSA key and an
