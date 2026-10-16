@@ -1,15 +1,21 @@
 // Tacet's app icon, drawn as vectors with Core Graphics (no SF Symbols: their
 // licence doesn't allow them in app icons).
 //
-//   swift Icon/make-icon.swift preview <dir>          512 px previews, every variant, light + dark
-//   swift Icon/make-icon.swift iconset <variant> <dir> Tacet.iconset for iconutil (light)
+// Direction "Glass" (2026-10-16): neutral dark glass, always dark. A graphite
+// squircle with a rim light; the double chevron « as frosted white glass,
+// the front chevron solid, the one behind translucent.
+//
+//   swift Icon/make-icon.swift preview <dir>           512 px previews of every variant
+//   swift Icon/make-icon.swift iconset <variant> <dir> Tacet.iconset for iconutil (full bleed)
+//   swift Icon/make-icon.swift png <variant> <px> <file> [masked]  one PNG (site exports)
 //
 // Geometry follows the macOS app icon grid: a 1024 canvas, an 824 pt squircle
-// inset 100 pt, a soft drop shadow below it.
+// inset 100 pt. The .icns is drawn full bleed: macOS 26+ applies its own mask
+// and glass edge (a pre-masked shape that doesn't match exactly is put on a
+// gray plate).
 import AppKit
 
-enum Variant: String, CaseIterable { case night, resting, glass }
-enum Look: String, CaseIterable { case light, dark }
+enum Variant: String, CaseIterable { case graphite, plate, bold }
 
 // MARK: Shapes
 
@@ -41,8 +47,8 @@ func chevron(tipX: CGFloat, midY: CGFloat, width: CGFloat, height: CGFloat, line
 }
 
 /// The double chevron «, centred on `center`.
-func doubleChevron(center: CGPoint, size: CGFloat) -> (back: CGPath, front: CGPath) {
-    let line = size * 0.16
+func doubleChevron(center: CGPoint, size: CGFloat, weight: CGFloat = 0.16) -> (back: CGPath, front: CGPath) {
+    let line = size * weight
     let w = size * 0.36, h = size * 0.78, gap = size * 0.30
     let total = w + gap
     let left = center.x - total / 2
@@ -68,118 +74,113 @@ func linear(_ ctx: CGContext, _ path: CGPath, _ colors: [CGColor], from: CGPoint
 
 /// Draws on a 1024 × 1024 canvas (y up). `fullBleed`: fill the whole square
 /// and let macOS apply its own mask (the app icon); otherwise draw the
-/// squircle with its shadow (previews).
-func draw(_ v: Variant, _ look: Look, fullBleed: Bool = false, in ctx: CGContext) {
+/// squircle with its shadow and rim (previews, site images).
+func draw(_ v: Variant, fullBleed: Bool = false, in ctx: CGContext) {
     let body = fullBleed ? CGRect(x: 0, y: 0, width: 1024, height: 1024) : CGRect(x: 100, y: 100, width: 824, height: 824)
     let shape = fullBleed ? CGPath(rect: body, transform: nil) : squircle(body)
-    let dark = look == .dark
+    let topY = body.maxY, bottomY = body.minY
 
-    // Drop shadow, as on system icons.
     if !fullBleed {
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: color(0x000000, 0.35))
-    ctx.addPath(shape)
-    ctx.setFillColor(color(0x000000))
-    ctx.fillPath()
-    ctx.restoreGState()
+        // Drop shadow, as on system icons.
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: color(0x000000, 0.35))
+        ctx.addPath(shape)
+        ctx.setFillColor(color(0x1C1C1F))
+        ctx.fillPath()
+        ctx.restoreGState()
     }
 
-    // Background.
-    let top = CGPoint(x: 512, y: 924), bottom = CGPoint(x: 512, y: 100)
-    switch (v, dark) {
-    case (.night, false): linear(ctx, shape, [color(0x3B3F9E), color(0x141C46)], from: top, to: bottom)
-    case (.night, true): linear(ctx, shape, [color(0x22245A), color(0x070A1A)], from: top, to: bottom)
-    case (.resting, false): linear(ctx, shape, [color(0xFBFCFE), color(0xDCE2EE)], from: top, to: bottom)
-    case (.resting, true): linear(ctx, shape, [color(0x30333D), color(0x121419)], from: top, to: bottom)
-    case (.glass, false): linear(ctx, shape, [color(0x5AA8F0), color(0x5536C8)], from: CGPoint(x: 160, y: 924), to: CGPoint(x: 864, y: 100))
-    case (.glass, true): linear(ctx, shape, [color(0x24496E), color(0x231552)], from: CGPoint(x: 160, y: 924), to: CGPoint(x: 864, y: 100))
-    }
+    // Graphite base: lighter at the top, near black at the bottom.
+    linear(ctx, shape, [color(0x4A4A50), color(0x2A2A2E), color(0x1C1C1F)], from: CGPoint(x: 512, y: topY), to: CGPoint(x: 512, y: bottomY))
 
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
+    // Glass bloom from the top and a faint sheen across the upper half.
+    let space = CGColorSpace(name: CGColorSpace.sRGB)!
+    let bloom = CGGradient(colorsSpace: space, colors: [color(0xFFFFFF, 0.16), color(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
+    ctx.drawRadialGradient(bloom, startCenter: CGPoint(x: 512, y: topY + 80), startRadius: 0,
+                           endCenter: CGPoint(x: 512, y: topY + 80), endRadius: 640, options: [])
+    let sheen = CGGradient(colorsSpace: space, colors: [color(0xFFFFFF, 0.07), color(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(sheen, start: CGPoint(x: 512, y: topY), end: CGPoint(x: 512, y: (topY + bottomY) / 2), options: [])
 
-    // Variant details behind the glyph.
-    switch v {
-    case .night:
-        // A faint menu bar across the top, with a hairline under it.
-        ctx.setFillColor(color(0xFFFFFF, dark ? 0.06 : 0.09))
-        ctx.fill(CGRect(x: 100, y: 800, width: 824, height: 124))
-        ctx.setFillColor(color(0xFFFFFF, dark ? 0.10 : 0.16))
-        ctx.fill(CGRect(x: 100, y: 798, width: 824, height: 3))
-    case .resting:
-        // The line the chevron rests on (a staff line / the menu bar edge).
-        let bar = CGPath(roundedRect: CGRect(x: 250, y: 318, width: 524, height: 22), cornerWidth: 11, cornerHeight: 11, transform: nil)
-        ctx.addPath(bar)
-        ctx.setFillColor(dark ? color(0xB9B6FF, 0.55) : color(0x4B4AB8, 0.35))
+    if v == .plate {
+        // A second, frosted glass pane under the chevrons.
+        let pane = CGPath(roundedRect: CGRect(x: 232, y: 232, width: 560, height: 560), cornerWidth: 140, cornerHeight: 140, transform: nil)
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 34, color: color(0x000000, 0.45))
+        ctx.addPath(pane)
+        ctx.setFillColor(color(0x55555C, 0.55))
         ctx.fillPath()
-    case .glass:
-        break
+        ctx.restoreGState()
+        linear(ctx, pane, [color(0xFFFFFF, 0.14), color(0xFFFFFF, 0.03)], from: CGPoint(x: 512, y: 792), to: CGPoint(x: 512, y: 232))
+        ctx.saveGState()
+        ctx.addPath(pane)
+        ctx.clip()
+        ctx.addPath(pane)
+        ctx.setLineWidth(5)
+        ctx.setStrokeColor(color(0xFFFFFF, 0.22))
+        ctx.strokePath()
+        ctx.restoreGState()
     }
-
-    // Glass sheen: a soft light from the top, and an edge highlight.
-    let sheen = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                           colors: [color(0xFFFFFF, dark ? 0.10 : 0.22), color(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(sheen, startCenter: CGPoint(x: 400, y: 960), startRadius: 0, endCenter: CGPoint(x: 400, y: 960), endRadius: 620, options: [])
     ctx.restoreGState()
 
     if !fullBleed {
-    ctx.saveGState()
-    ctx.addPath(shape)
-    ctx.setLineWidth(4)
-    ctx.setStrokeColor(color(0xFFFFFF, dark ? 0.12 : (v == .resting ? 0.9 : 0.22)))
-    ctx.strokePath()
-    ctx.restoreGState()
+        // Rim light: bright along the top edge, fading down the sides.
+        ctx.saveGState()
+        ctx.addPath(shape)
+        ctx.clip()
+        ctx.addPath(shape)
+        ctx.setLineWidth(7)
+        ctx.replacePathWithStrokedPath()
+        ctx.clip()
+        let rim = CGGradient(colorsSpace: space, colors: [color(0xFFFFFF, 0.42), color(0xFFFFFF, 0.08), color(0xFFFFFF, 0.04)] as CFArray, locations: [0, 0.45, 1])!
+        ctx.drawLinearGradient(rim, start: CGPoint(x: 512, y: topY), end: CGPoint(x: 512, y: bottomY), options: [])
+        ctx.restoreGState()
     }
 
     // The double chevron.
-    let center: CGPoint
-    let size: CGFloat
-    switch v {
-    case .night: (center, size) = (CGPoint(x: 512, y: 470), 400)
-    case .resting: (center, size) = (CGPoint(x: 512, y: 560), 360)
-    case .glass: (center, size) = (CGPoint(x: 512, y: 512), 440)
+    let (center, size): (CGPoint, CGFloat) = switch v {
+    case .graphite: (CGPoint(x: 512, y: 512), 450)
+    case .plate: (CGPoint(x: 512, y: 512), 340)
+    case .bold: (CGPoint(x: 512, y: 512), 500)
     }
-    let glyph = doubleChevron(center: center, size: size)
+    let glyph = doubleChevron(center: center, size: size, weight: v == .bold ? 0.20 : 0.16)
+    let glyphTop = center.y + size * 0.48, glyphBottom = center.y - size * 0.48
 
-    func glassFill(_ path: CGPath, top: CGColor, bottom: CGColor, shadow: CGFloat) {
+    /// Frosted white glass: a soft shadow under it, a vertical fill, a bright
+    /// specular band across its top and a thin edge.
+    func glass(_ path: CGPath, top: CGFloat, bottom: CGFloat, shadow: CGFloat, specular: CGFloat) {
         ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0x000000, shadow))
+        ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: color(0x000000, shadow))
         ctx.addPath(path)
-        ctx.setFillColor(bottom)
+        ctx.setFillColor(color(0xFFFFFF, bottom))
         ctx.fillPath()
         ctx.restoreGState()
-        linear(ctx, path, [top, bottom], from: CGPoint(x: 512, y: center.y + size / 2), to: CGPoint(x: 512, y: center.y - size / 2))
-        // Specular edge on top.
+        linear(ctx, path, [color(0xFFFFFF, top), color(0xF2F2F7, bottom)], from: CGPoint(x: 512, y: glyphTop), to: CGPoint(x: 512, y: glyphBottom))
         ctx.saveGState()
         ctx.addPath(path)
         ctx.clip()
+        let spec = CGGradient(colorsSpace: space, colors: [color(0xFFFFFF, specular), color(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
+        ctx.drawLinearGradient(spec, start: CGPoint(x: 512, y: glyphTop), end: CGPoint(x: 512, y: center.y + size * 0.05), options: [])
         ctx.addPath(path)
-        ctx.setLineWidth(5)
-        ctx.setStrokeColor(color(0xFFFFFF, 0.35))
+        ctx.setLineWidth(6)
+        ctx.setStrokeColor(color(0xFFFFFF, 0.5))
         ctx.strokePath()
         ctx.restoreGState()
     }
 
-    switch (v, dark) {
-    case (.night, _):
-        let a: CGFloat = dark ? 0.82 : 1
-        glassFill(glyph.back, top: color(0xFFFFFF, 0.55 * a), bottom: color(0xC9CFFF, 0.40 * a), shadow: 0.25)
-        glassFill(glyph.front, top: color(0xFFFFFF, a), bottom: color(0xD6DBFF, 0.92 * a), shadow: 0.35)
-    case (.resting, false):
-        glassFill(glyph.back, top: color(0x7C7BE6, 0.55), bottom: color(0x4B4AB8, 0.55), shadow: 0.10)
-        glassFill(glyph.front, top: color(0x6E6CF0), bottom: color(0x3F3DAA), shadow: 0.22)
-    case (.resting, true):
-        glassFill(glyph.back, top: color(0xD9D7FF, 0.45), bottom: color(0xA9A6F5, 0.45), shadow: 0.30)
-        glassFill(glyph.front, top: color(0xE6E4FF), bottom: color(0xA9A6F5), shadow: 0.40)
-    case (.glass, _):
-        let a: CGFloat = dark ? 0.85 : 1
-        glassFill(glyph.back, top: color(0xFFFFFF, 0.45 * a), bottom: color(0xFFFFFF, 0.25 * a), shadow: 0.20)
-        glassFill(glyph.front, top: color(0xFFFFFF, 0.98 * a), bottom: color(0xE8E4FF, 0.88 * a), shadow: 0.35)
+    switch v {
+    case .graphite, .plate:
+        glass(glyph.back, top: 0.42, bottom: 0.22, shadow: 0.30, specular: 0.25)
+        glass(glyph.front, top: 0.98, bottom: 0.80, shadow: 0.55, specular: 0.6)
+    case .bold:
+        glass(glyph.back, top: 0.50, bottom: 0.28, shadow: 0.30, specular: 0.25)
+        glass(glyph.front, top: 1.0, bottom: 0.85, shadow: 0.55, specular: 0.6)
     }
 }
 
-func render(_ v: Variant, _ look: Look, pixels: Int, fullBleed: Bool = false) -> Data {
+func render(_ v: Variant, pixels: Int, fullBleed: Bool = false) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                bytesPerRow: 0, bitsPerPixel: 0)!
@@ -187,37 +188,40 @@ func render(_ v: Variant, _ look: Look, pixels: Int, fullBleed: Bool = false) ->
     ctx.interpolationQuality = .high
     ctx.setShouldAntialias(true)
     ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-    draw(v, look, fullBleed: fullBleed, in: ctx)
+    draw(v, fullBleed: fullBleed, in: ctx)
     return rep.representation(using: .png, properties: [:])!
 }
 
 // MARK: Main
 
-let args = CommandLine.arguments.dropFirst()
+let args = Array(CommandLine.arguments.dropFirst())
 switch args.first {
 case "preview":
-    let dir = URL(fileURLWithPath: args.dropFirst().first ?? "Icon/previews")
+    let dir = URL(fileURLWithPath: args.count > 1 ? args[1] : "Icon/previews")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for v in Variant.allCases {
-        for look in Look.allCases {
-            try render(v, look, pixels: 512).write(to: dir.appendingPathComponent("\(v.rawValue)-\(look.rawValue).png"))
+        try render(v, pixels: 512).write(to: dir.appendingPathComponent("\(v.rawValue).png"))
+        for px in [16, 32, 64] {
+            try render(v, pixels: px).write(to: dir.appendingPathComponent("\(v.rawValue)-\(px).png"))
         }
     }
     print("Previews in \(dir.path)")
 case "iconset":
-    let rest = Array(args.dropFirst())
-    guard let name = rest.first, let v = Variant(rawValue: name), rest.count > 1 else {
+    guard args.count > 2, let v = Variant(rawValue: args[1]) else {
         print("usage: iconset <\(Variant.allCases.map(\.rawValue).joined(separator: "|"))> <dir>"); exit(1)
     }
-    let dir = URL(fileURLWithPath: rest[1])
+    let dir = URL(fileURLWithPath: args[2])
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for base in [16, 32, 128, 256, 512] {
-        // Full bleed: macOS 26+ masks it to its own shape; a pre-drawn
-        // squircle that doesn't match exactly gets put on a gray plate.
-        try render(v, .light, pixels: base, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base).png"))
-        try render(v, .light, pixels: base * 2, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base)@2x.png"))
+        try render(v, pixels: base, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base).png"))
+        try render(v, pixels: base * 2, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base)@2x.png"))
     }
     print("Iconset in \(dir.path)")
+case "png":
+    guard args.count > 3, let v = Variant(rawValue: args[1]), let px = Int(args[2]) else {
+        print("usage: png <variant> <px> <file> [masked]"); exit(1)
+    }
+    try render(v, pixels: px, fullBleed: !args.contains("masked")).write(to: URL(fileURLWithPath: args[3]))
 default:
-    print("usage: make-icon.swift preview <dir> | iconset <variant> <dir>")
+    print("usage: make-icon.swift preview <dir> | iconset <variant> <dir> | png <variant> <px> <file> [masked]")
 }
