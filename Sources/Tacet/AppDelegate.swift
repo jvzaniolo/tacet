@@ -10,7 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var expiryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Log.write("Tacet starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString) from \(Bundle.main.bundlePath)")
+        Log.write("Tacet \(BuildInfo.shortVersion) (\(BuildInfo.build)) starting on macOS \(BuildInfo.macOSVersion)\(Bundle.main.bundlePath.hasPrefix("/Applications/") ? "" : ", outside /Applications")")
+        Log.debug("Bundle: \(Bundle.main.bundlePath)")
         Log.write("Switches supported: \(MenuBarSwitches.isSupported)")
         quitCleanlyOnSignals()
         if let expiry = BuildInfo.betaExpiry { Log.write("Beta build \(BuildInfo.shortVersion) (\(BuildInfo.build)), expires \(expiry)") }

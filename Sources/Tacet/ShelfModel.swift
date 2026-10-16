@@ -66,7 +66,8 @@ final class ShelfModel {
             }
             return
         }
-        Log.write("Launch: switches " + current.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value ? "on" : "off")" }.joined(separator: ", ")
+        Log.write("Launch: \(current.count) tracked app(s), \(hidden.count) hidden, \(heldOff.count) held off")
+        Log.debug("Launch: switches " + current.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value ? "on" : "off")" }.joined(separator: ", ")
                   + "; hidden \(hidden.sorted()); held off \(heldOff.sorted())")
         if !heldOff.isEmpty {
             // The last run didn't restore on quit (crash, kill -9, power loss).
@@ -76,7 +77,8 @@ final class ShelfModel {
             // them again. Anything held off but no longer hidden is restored.
             let stillOff = heldOff.filter { current[$0] == false }
             let orphaned = stillOff.subtracting(hidden)
-            Log.write("Launch: recovering from the last run; held off \(heldOff.sorted()), still off \(stillOff.sorted())")
+            Log.write("Launch: recovering from the last run; \(heldOff.count) held off, \(stillOff.count) still off")
+            Log.debug("Launch: held off \(heldOff.sorted()), still off \(stillOff.sorted())")
             heldOff = stillOff
             Journal.save(heldOff)
             if !orphaned.isEmpty { write(Dictionary(uniqueKeysWithValues: orphaned.map { ($0, true) })) }
@@ -89,7 +91,7 @@ final class ShelfModel {
     func restoreAll() -> Bool {
         guard !heldOff.isEmpty else { return true }
         guard access == .granted else {
-            Log.write("Restore: no access; \(heldOff.sorted()) stay off")
+            Log.write("Restore: no access; \(heldOff.count) app(s) stay off")
             return false
         }
         return write(Dictionary(uniqueKeysWithValues: heldOff.map { ($0, true) }))
@@ -147,12 +149,14 @@ final class ShelfModel {
             heldOff.remove(id)
             changed = true
             if current[id] == true, hidden.remove(id) != nil {
-                Log.write("Reconcile: \(id) was turned on in System Settings; now Visible")
+                Log.write("Reconcile: an app was turned on in System Settings; now Visible")
+                Log.debug("Reconcile: \(id) turned on in System Settings")
             }
         }
         for id in hidden where current[id] == false && !heldOff.contains(id) {
             hidden.remove(id)
-            Log.write("Reconcile: \(id) was turned off in System Settings; Tacet won't turn it on")
+            Log.write("Reconcile: an app was turned off in System Settings; Tacet won't turn it on")
+            Log.debug("Reconcile: \(id) turned off in System Settings")
         }
         if changed { Journal.save(heldOff) }
         rebuildRows()

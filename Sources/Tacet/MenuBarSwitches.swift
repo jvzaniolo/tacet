@@ -181,7 +181,8 @@ enum MenuBarSwitches {
         // Read back: the write only counts if cfprefsd now holds it.
         let after = Dictionary((read() ?? []).map { ($0.bundleID, $0.isAllowed) }, uniquingKeysWith: { a, _ in a })
         let stuck = changes.allSatisfy { id, wanted in after[id].map { $0 == wanted } ?? true }
-        Log.write("Switches: wrote \(changed.sorted().joined(separator: ", ")) (synced \(synced), verified \(stuck))")
+        Log.write("Switches: wrote \(changed.count) change(s) (synced \(synced), verified \(stuck))")
+        Log.debug("Switches: wrote \(changed.sorted().joined(separator: ", "))")
         return stuck
     }
 }
