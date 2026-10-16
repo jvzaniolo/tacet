@@ -35,6 +35,35 @@ build/MenuShelf.app/Contents/MacOS/MenuShelf
 Output also goes to `~/Library/Logs/MenuShelf.log` and the unified log
 (subsystem `dev.menushelf.MenuShelf`).
 
+## How v1 works
+
+- **Hiding:** MenuShelf adds a divider status item and sizes it so macOS
+  pushes it, and every icon to its left, into the menu bar's native overflow.
+  No permission is needed for this.
+- **Configuring:** on first run, or via right-click → **Edit Layout…**, the
+  divider becomes a visible line. ⌘-drag icons to its left to hide them,
+  then click **Done**.
+- **One arrow:** macOS shows its own « overflow arrow. MenuShelf sits an
+  invisible window on top of it, so clicking it opens MenuShelf's panel
+  instead of macOS's expansion.
+- **Revealing:** the hidden icons slide into the empty part of the bar with
+  a light spring and fade. Click one to open its menu. Click anywhere else,
+  or the arrow, to close.
+- **Right-click the arrow** for Edit Layout, Refresh Item Images,
+  Permissions, Diagnostics and Quit.
+
+Limits and evidence: [NOTES-macos27.md](NOTES-macos27.md) §10. Hiding works
+on displays with a notch. Wide external displays show everything.
+
+### Launch flags
+
+| Flag | Effect |
+| --- | --- |
+| *(none)* | MenuShelf v1 |
+| `--debug` | Accept commands from `scripts/spike.swift` (`build/spike snap`, `open`, `press 2`, …) |
+| `--legacy` | First prototype: own chevron, per-app VisibleCC hiding, list window |
+| `--spike` | Legacy + the spacer spike tooling (NOTES §8–9) |
+
 ## Self-test
 
 ```bash
@@ -65,17 +94,19 @@ Details and what is still unverified: [NOTES-macos27.md](NOTES-macos27.md).
 
 | Permission | Needed for | How |
 | --- | --- | --- |
-| Accessibility | Listing other apps' menu bar items, opening them | Required. MenuShelf shows a window with a button that opens System Settings → Privacy & Security → Accessibility; you turn MenuShelf on there. |
+| Accessibility | Finding hidden icons and the arrow, opening icons from the panel | **Required.** The Permissions window opens System Settings → Privacy & Security → Accessibility; you turn MenuShelf on there. |
+| Screen Recording | Real icon images in the panel | Optional. Without it the panel shows app icons. Captures happen only when you finish editing the layout. |
 
 MenuShelf never changes System Settings itself.
 
-**Ad-hoc signing caveat:** macOS ties an ad-hoc signed app's Accessibility grant
-to the exact binary. After a rebuild, the switch in System Settings may still
-look on but no longer apply. Turn MenuShelf off and on again (or remove it with
-**–** and re-add it) after each rebuild. Signing with a stable Developer ID
-certificate avoids this.
+**Keep permissions across rebuilds:** create a self-signed code-signing
+certificate (Keychain Access → Certificate Assistant → Create a Certificate…,
+type Code Signing) named `MenuShelf Dev`, or pass its name in
+`SIGN_IDENTITY`. Without it the build is signed ad hoc, and macOS drops both
+grants on every rebuild: remove MenuShelf with **–** in each list and add it
+again.
 
-## Using it
+## Using the legacy prototype (`--legacy`)
 
 - **Left-click** the chevron: show or hide the apps you marked Hidden.
 - **Right-click** (or control-click) the chevron: menu with the Hidden apps and
@@ -96,7 +127,9 @@ Sources/MenuShelf/
   AX.swift                    Accessibility helpers
   MenuBarEnumerator.swift     Lists menu bar items per app via AXExtrasMenuBar
   AppModel.swift              Scan results, Hidden set, revealed state
-  Hiding.swift                VisibleCC hiding backend, app relauncher
+  Shelf/                      v1: HidingSpacer, ArrowCatcher, RevealPanel,
+                              ItemImageCache, BarReader, ShelfController
+  Hiding.swift                VisibleCC hiding backend (legacy only)
   SelfTest.swift              --selftest for the hiding backend
   Log.swift                   Console / unified log / ~/Library/Logs output
   StatusItemController.swift  The chevron status item and its menu

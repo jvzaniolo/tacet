@@ -1,27 +1,34 @@
 import AppKit
 import SwiftUI
 
-/// Shown while Accessibility is not granted. MenuShelf never changes System
-/// Settings itself: it explains why and opens the right pane for the user.
+/// Permissions window. MenuShelf never changes System Settings itself: it
+/// explains each permission and opens the right pane for the user.
+/// - Accessibility (required): read the bar, find hidden items, open them.
+/// - Screen Recording (optional): real item images in the panel instead of
+///   app icons.
 @MainActor
 final class OnboardingController {
     private var window: NSWindow?
     private var timer: Timer?
-    private let onGranted: () -> Void
+    private let state = PermissionState()
+    private let onAccessibilityGranted: () -> Void
+    private var reportedGrant = false
 
     init(onGranted: @escaping () -> Void) {
-        self.onGranted = onGranted
+        self.onAccessibilityGranted = onGranted
     }
 
     func showIfNeeded() {
-        guard !AX.isTrusted(prompt: false) else { return }
+        state.refresh()
+        if !state.accessibility { show() }
+    }
+
+    func show() {
+        state.refresh()
         if window == nil {
-            let view = OnboardingView(
-                openSettings: { Self.openAccessibilitySettings() },
-                checkAgain: { [weak self] in self?.check() }
-            )
+            let view = PermissionsView(state: state, close: { [weak self] in self?.window?.close() })
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "MenuShelf needs Accessibility"
+            window.title = "MenuShelf Permissions"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.center()
@@ -30,64 +37,120 @@ final class OnboardingController {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
 
-        // The grant has no callback; poll while the window is up.
+        // Grants have no callback; poll while the window is up.
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.check() }
+            MainActor.assumeIsolated { self?.poll() }
         }
     }
 
-    private func check() {
-        guard AX.isTrusted(prompt: false) else { return }
-        timer?.invalidate()
-        timer = nil
-        window?.close()
-        onGranted()
+    private func poll() {
+        state.refresh()
+        if state.accessibility, !reportedGrant {
+            reportedGrant = true
+            onAccessibilityGranted()
+        }
+        if window?.isVisible != true {
+            timer?.invalidate()
+            timer = nil
+        }
     }
 
     static func openAccessibilitySettings() {
-        // Registers MenuShelf in the Accessibility list (switched off) so the
-        // user only has to flip the switch. This does not grant anything.
+        // Registers MenuShelf in the list (switched off) so the user only has
+        // to flip the switch. This does not grant anything.
         _ = AX.isTrusted(prompt: true)
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
+        open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+    }
+
+    static func openScreenRecordingSettings() {
+        // Same idea: adds MenuShelf to the Screen Recording list.
+        _ = CGRequestScreenCaptureAccess()
+        open("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+    }
+
+    private static func open(_ string: String) {
+        if let url = URL(string: string) { NSWorkspace.shared.open(url) }
     }
 }
 
-private struct OnboardingView: View {
-    let openSettings: () -> Void
-    let checkAgain: () -> Void
+@MainActor
+@Observable
+final class PermissionState {
+    var accessibility = false
+    var screenRecording = false
+
+    func refresh() {
+        accessibility = AX.isTrusted(prompt: false)
+        screenRecording = CGPreflightScreenCaptureAccess()
+    }
+}
+
+private struct PermissionsView: View {
+    let state: PermissionState
+    let close: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: "accessibility")
-                    .font(.system(size: 34))
-                    .foregroundStyle(.tint)
-                Text("Allow MenuShelf to use Accessibility")
-                    .font(.title2.bold())
-            }
-            Text("""
-            On macOS 27 the menu bar is drawn as a single window, so MenuShelf \
-            can only see other apps' menu bar items through Accessibility. It \
-            uses it to list items, read their position and name, and open an \
-            item when you pick it from MenuShelf's menu.
-            """)
-            Text("""
-            Click the button below, then turn on MenuShelf under \
-            Privacy & Security → Accessibility. This window closes by itself \
-            once access is on.
-            """)
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 18) {
+            Text("MenuShelf needs your permission").font(.title2.bold())
+            PermissionRow(
+                icon: "accessibility",
+                title: "Accessibility",
+                badge: "Required",
+                text: "Lets MenuShelf find the icons you hid and open them when you click them in its panel.",
+                granted: state.accessibility,
+                action: OnboardingController.openAccessibilitySettings
+            )
+            PermissionRow(
+                icon: "rectangle.dashed.badge.record",
+                title: "Screen Recording",
+                badge: "Optional",
+                text: "Shows the real icons in the panel. Without it MenuShelf shows each app's icon instead. MenuShelf only looks at the menu bar, and only while you edit the layout. You may need to quit and reopen MenuShelf after turning it on.",
+                granted: state.screenRecording,
+                action: OnboardingController.openScreenRecordingSettings
+            )
+            Text("You turn these on yourself in System Settings → Privacy & Security. MenuShelf never changes your settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack {
-                Button("Check Again", action: checkAgain)
                 Spacer()
-                Button("Open Accessibility Settings…", action: openSettings)
+                Button("Done", action: close)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!state.accessibility)
             }
         }
         .padding(24)
-        .frame(width: 460)
+        .frame(width: 500)
+    }
+}
+
+private struct PermissionRow: View {
+    let icon: String
+    let title: String
+    let badge: String
+    let text: String
+    let granted: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 26))
+                .foregroundStyle(.tint)
+                .frame(width: 34)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(title).font(.headline)
+                    Text(badge).font(.caption).foregroundStyle(.secondary)
+                }
+                Text(text).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if granted {
+                    Label("On", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                } else {
+                    Button("Open System Settings…", action: action)
+                }
+            }
+        }
     }
 }

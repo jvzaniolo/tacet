@@ -484,3 +484,134 @@ verdict a live sizer wasn't pursued further:
 - Apple's arrow will still exist whenever the spacer causes overflow. Test
   whether it's acceptable to leave it, or whether to size the spacer so that
   it is the only thing overflowing.
+
+---
+
+## 10. v1 design: spacer hides, our panel reveals, one arrow (2026-10-16)
+
+### Choosing the hiding mechanism
+
+| Option | Evidence | Verdict |
+| --- | --- | --- |
+| Per-app `VisibleCC` (§2c) | `NSStatusItem VisibleCC MenuShelfChevron = false` on MenuShelf's own item. **Live: no effect** (still drawn). **After relaunch: really gone**, from both AX and MenuBarAgent's drawn list. The freed room also made Apple's arrow disappear. | True hiding, but **only when the app creates the item**, so every hide or show needs the app relaunched. An unpublished item can't be opened either. Unusable for click-to-reveal. |
+| Spacer (§8–9) | Hides natively, no permission. Apple's arrow then always appears at the spacer's right end. | **Chosen** for hiding. |
+
+**Getting exactly one arrow:**
+- macOS's arrow *is* `chevron.backward.2`. So we don't add a second chevron:
+  we keep Apple's arrow and lay an almost transparent, click-catching window
+  over it (`ArrowCatcher`).
+- Its clicks open *our* panel, so Apple's expansion (with its gap, §9) never
+  runs.
+- While our panel is open the catcher draws a pressed capsule with
+  `chevron.forward.2`, like the native control does when expanded.
+- Verified: with the panel closed, the bar has Apple's arrow and nothing else
+  of ours. The spacer is inside the overflow.
+
+### How v1 works (`Sources/MenuShelf/Shelf/`)
+
+- **`HidingSpacer`**
+  - Status item `MenuShelfSpacer`, sized live to
+    `rightEdge − boundary − 53 + 8` pt with 3 pt hysteresis. `rightEdge` is
+    corrected by +8 pt while overflowed.
+  - Boundary: the notch's right edge, or the end of the app menus.
+  - Refuses targets over 740 pt (§8 dead zones) instead of clamping, so a
+    wide display never makes the width oscillate.
+- **Edit mode** (first run, or right-click → Edit Layout…)
+  - The spacer shrinks to a 22 pt visible divider; you ⌘-drag icons across it.
+  - On Done, MenuShelf photographs the bar (all icons are visible then), saves
+    the order, and re-hides.
+- **`ArrowCatcher`**: left-click toggles the panel; right-click or ⌃-click
+  opens our menu (Edit Layout, Refresh Item Images, Permissions, Diagnostics,
+  Quit).
+- **`RevealPanel`**: borderless non-activating `NSPanel` at status-bar level + 1.
+  - **Inline** in the empty bar left of the arrow when it fits, with no
+    background, so the icons look like they returned to the bar. On notch
+    displays the room the hidden icons left is exactly that gap. Otherwise a
+    dropdown in menu material under the bar.
+  - Animation: `CASpringAnimation` on translation (14 pt from the arrow side,
+    stiffness 340, damping 26, ≈ 0.35 s with a light overshoot) plus a
+    0.18 s fade. Close: 0.16 s fade.
+  - User: "open animation is awesome".
+- **Images** (`ItemImageCache`)
+  - One ScreenCaptureKit capture of the bar strip (Screen Recording), cropped
+    per item, kept in memory and in `~/Library/Application Support/MenuShelf/ItemImages`.
+  - Never captured on click. Without Screen Recording, app icons are used.
+  - Items still in overflow at capture time are skipped (cropping there
+    captured Apple's arrow).
+  - The cache key ignores digits, because text items like "13m left" change.
+- **Opening an item**: AXPress on the real (overflowed) item. The panel
+  closes first, like the native overflow.
+- **Closing**: global mouse-down outside the panel and catcher, or a click on
+  the arrow. No timer.
+- **Isolation**: the default launch is v1. `--legacy` runs the first
+  prototype (VisibleCC + list window). `--spike` adds the spike controller.
+  `--debug` lets the shelf accept commands from `scripts/spike.swift` (snap,
+  open, close, press n, width w, auto, edit, done). Debug only, because any
+  local process could send them.
+
+### Verified on this Mac (built-in notch display, Dell unplugged)
+
+- The spacer settled at 453 pt and hid 7 icons (OrbStack, ChatGPT,
+  1Password, Raycast, Stats, Claude, Raycast "OCB"). Wi-Fi, A/V, Battery,
+  Control Center and Clock stayed visible.
+- Panel opened inline at x 1101–1484 with real images. Your photo shows the
+  icons in bar order and our » capsule.
+- **Open animation:** you confirmed it works and looks good.
+- **Closing on an outside click:** you closed the panel this way during the
+  test.
+- **Opening items:** OrbStack and Stats → `AXPress` = 0 (success).
+  - Stats' popover appeared at x 867–1147 under the bar. That is the item's
+    parked overflow position (just right of the notch), about 200 pt left of
+    its icon in our panel. Sensible, but not aligned.
+  - `defaults write dev.menushelf.MenuShelf pressMode reveal` switches to the
+    alternative: let items back onto the bar, then press, so the menu lands
+    under the real icon. Built, **not tested**, and it relayouts the bar.
+- **Permissions:** Accessibility + Screen Recording both granted; with the
+  "MenuShel Dev" self-signed certificate they survived rebuilds.
+
+### Not working / not verified
+
+- **Wide external displays without a notch:** the spacer can't hide there.
+  - On the Dell (2560 pt, app menus ending at x 73) hiding needed about
+    1724 pt. From 1000 pt up macOS drops the spacer.
+  - v1 keeps the width it computed for the notch display, so the Dell simply
+    shows everything.
+  - With both displays connected, AX keeps reporting the Dell's bar even with
+    focus on the MacBook. The width then only updates when the MacBook bar
+    is the one reported.
+  - Multi-display needs real work before v1 ships.
+- Exact native close behaviour when an item's menu opens: we close our
+  panel; native behaviour not compared.
+- Hover states, keyboard (Esc), VoiceOver for the panel, dark/light
+  appearance of the » capsule (only seen in one appearance), Stage Manager
+  and full-screen spaces.
+- An app adding or removing an icon while the panel is open (a refresh
+  happens within 2 s; not exercised).
+
+### Permissions summary
+
+| Piece | Permission |
+| --- | --- |
+| Hiding (spacer), ⌘-drag config | None |
+| Finding hidden items, arrow position, opening items | **Accessibility (required)** |
+| Real icon images | Screen Recording (optional; app-icon fallback) |
+| Menu bar layout file | Not used |
+
+Accessibility is required, so **not Mac App Store**. Ship as a notarized
+direct download.
+
+### Left for v1
+
+- Multi-display (see above). Ideally detect the menu bar each display shows
+  and accept that wide displays show everything.
+- Real Developer ID signing + notarization (hardened runtime: AX and SCK work
+  with it; test). Sparkle for updates.
+- Licensing for $5 lifetime: Paddle/Lemon Squeezy/Gumroad license keys with
+  offline check.
+- Launch at login (`SMAppService.mainApp`), an app icon, a settings minimum
+  (show hidden on hover? hotkey?).
+- Remove or rewrite the legacy and spike code before release. It is behind
+  flags now, but still compiled in. The VisibleCC code writes other apps'
+  preferences.
+- No Thaw/Ice code is used anywhere. All implementation is original; Thaw
+  was only read for mechanisms.
