@@ -754,3 +754,140 @@ MBAssessmentModeAssertion      -init
   element first, then reveal-that-app; not built.
 - Release work: Developer ID signing + notarization (install to
   /Applications), Sparkle, $5 licensing, launch at login, an app icon.
+
+---
+
+## 12. Investigation: the "Allow in the Menu Bar" switches, made fast? (2026-10-16)
+
+**Why:** the user rejects the restriction's side effects (§11 E4: no
+Notification Center from the clock, no camera/mic indicator, no Focus, no Now
+Playing): "it looks like an app bug". The System Settings switches keep all
+of that but were thought to be slow (justhide: starts ~0.1 s, gone ~0.8 s,
+back ~0.5 s).
+
+**Tooling (`--debug`, `ControlCenterSwitches.swift`):**
+- `ccpick`: the user picks the plist once in an open panel; we keep a
+  security-scoped bookmark.
+- `ccdump`: read-only dump.
+- `ccwatch`: polls the setting and file.
+- `ccset`: changes the flags in one write; the first write saves a backup.
+- `ccrestore`: writes the backup back.
+- `--no-hide`: MenuShelf restricts nothing during these tests.
+
+The recordings use the 60 fps ScreenCaptureKit stream. Note: the stream itself
+makes macOS add its screen-sharing indicator to the bar, so start measuring
+~1.5 s after it.
+
+Mechanisms are described here in our own words. No justhide/Thaw code was
+used.
+
+### Where the switches live
+
+- File: `~/Library/Group Containers/group.com.apple.controlcenter/Library/Preferences/group.com.apple.controlcenter.plist`.
+- Keys: `trackedApplications`, `remoteLiveActivityApplications`,
+  `showSpotlight`, `showWeather`.
+- `trackedApplications` is a **binary plist inside a Data value**: an array
+  of alternating key/value entries.
+  - Key: `{bundle: {_0: "<bundle ID>"}}`.
+  - Value: `{isAllowed: Bool, location: {bundle: {_0: …}}, menuItemLocations: [ … ]}`.
+  - Ad-hoc tools appear with `adhocBinary` paths.
+  - This Mac has 11 apps, all allowed before and after the tests.
+- **A switch is the `isAllowed` flag.** Writing it from MenuShelf works:
+  - read the file through the bookmark;
+  - decode the array, flip `isAllowed` for the wanted bundle IDs, re-encode
+    as binary;
+  - write the Data with CoreFoundation's private container-aware preference
+    calls (`_CFPreferencesSetAppValueWithContainer` +
+    `_CFPreferencesAppSynchronizeWithContainer`, found by name with `dlsym`),
+    passing the group container path.
+
+### How a change propagates (both a System Settings click and our write)
+
+- cfprefsd → MenuBarAgent logs `[com.apple.ControlCenter:SystemItemMenuBarPreferences] Preferences: changed`
+  **within ~1 ms** of the write being synchronized:
+  - our OFF write: synced 12:04:29.032, logged 12:04:29.032;
+  - our ON write: 12:04:34.342 vs 12:04:34.342;
+  - the hand OFF in System Settings: logged 12:00:29.935, and MenuBarAgent
+    dropped OrbStack's element 1 ms later.
+- MenuBarAgent watches the preference itself. There is no Darwin
+  notification or XPC to trigger, and nothing to shave: **propagation is
+  already ~instant**.
+- The file on disk is flushed several seconds later (≈5 s), which doesn't
+  matter.
+
+### Measured (built-in notch display, 60 fps stream)
+
+| Change | Write → first pixel* | Animation | Total |
+| --- | --- | --- | --- |
+| Hand OFF in System Settings (OrbStack) | ~100 ms | ~450 ms slide | ~0.55 s |
+| Our write: OrbStack OFF | 115 ms | ~450 ms slide | ~0.56 s |
+| Our write: OrbStack ON | 126 ms | ~430 ms | ~0.56 s |
+| Our write: OrbStack + ChatGPT + 1Password OFF, **one write** | 122 ms | **~125 ms fade**, one pass | ~0.25 s |
+| Same three ON, one write | 167 ms | **~170 ms fade**, one pass | ~0.34 s |
+| Restriction (§11 E1), for comparison | ~130 ms | conceal ≈ 0.58 s, reveal ≈ 0.48 s | ~0.6–0.7 s |
+
+\* Includes the recorder's own frame latency (tens of ms).
+
+What sets the duration is the layout, not the mechanism:
+- **Fade only:** removed or returning icons fade (~125–170 ms) when nothing
+  else needs to move. On a right-aligned bar that means the hidden apps are
+  the leftmost ones.
+- **Fade + slide:** when icons left of the change must move over to fill or
+  open a gap, they slide (~450 ms). OrbStack alone, with ChatGPT left of it,
+  is that case.
+- MenuShelf hides the leftmost group (everything left of its divider), so
+  the common case is the **fast fade**.
+
+**Several apps in one write = one pass.** Always batch into a single write.
+
+**Rapid toggles:** four writes 120 ms apart (OFF, ON, OFF, ON) gave one
+continuous animation that **changes direction mid-flight** and settles on
+the final state after ~0.8 s, with no stall. The restriction instead
+finishes each animation before taking the next (the user's "freeze").
+
+**Side effects (user, by hand with two apps switched off):** Clock →
+Notification Center **works**; Control Center works; the camera/mic
+indicator **shows**; Focus and Now Playing **show**. None of the
+restriction's side effects.
+
+### Verdict
+
+- **The switches route is not slow.**
+  - Propagation is ~1 ms.
+  - The animation is MenuBarAgent's own and the same as under the
+    restriction: a fast fade for MenuShelf's usual leftmost group, a ~0.45 s
+    slide only when neighbours must move.
+  - It also handles rapid toggles better.
+  - The justhide numbers (~0.8 s out) match the slide case; we couldn't
+    reproduce anything slower.
+- **Nothing to speed up on our side** beyond:
+  1. one batched write per change;
+  2. no restriction in parallel;
+  3. keeping the hidden group leftmost, so it fades instead of slides.
+- **Hybrid** (the restriction only while opening/closing, the switches at
+  rest): **not worth it.** The restriction isn't faster (same animation), and
+  while it's held during the transition its side effects come back
+  (indicators blink out, a clock click during it fails). Switches alone give
+  the same speed with none of the side effects.
+
+**Recommendation: rebuild hiding on the switches**, with the restriction
+removed. Costs to handle:
+- **One-time file grant:** an open panel on the plist, plus a bookmark. Full
+  Disk Access is the alternative. It needs a clear onboarding step.
+- **State lives outside MenuShelf.**
+  - Hidden apps stay hidden if MenuShelf quits or crashes, and System
+    Settings shows them as "not allowed".
+  - Needs: restore on quit; a journal plus recovery on next launch; a "Show
+    all" item.
+- **Private CF calls and an undocumented schema** (re-read the file before
+  every write; the user or System Settings may change it meanwhile). A
+  report says the switches did nothing even by hand on 27.2 beta 26B5091g.
+  Re-test on each macOS update.
+- **New apps** appear in `trackedApplications` only after macOS sees them.
+  An app not yet in the list can't be hidden until it is.
+- **Per app,** like the restriction.
+- Accessibility is still needed only for reading positions on Done.
+
+All switches touched were restored and verified. The 11 apps were all
+allowed before and after; the user turned the two they toggled by hand back
+on.

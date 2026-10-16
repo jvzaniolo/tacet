@@ -51,6 +51,12 @@ enum DebugCommands {
             r.releaseAll()
             r.set(.hiding(ids(parts)))
         case "press": press(bundleID: parts.dropFirst().first ?? "")
+        case "ccpick": ControlCenterSwitches.pick()
+        case "ccdump": ControlCenterSwitches.dump()
+        case "ccwatch": ControlCenterSwitches.watch(parts.count > 1 && parts[1] == "on")
+        case "ccset":   // ccset <id,id,…> <0|1>
+            ControlCenterSwitches.setAllowed(parts.count > 2 && parts[2] == "1", for: ids(parts))
+        case "ccrestore": ControlCenterSwitches.restore()
         case "record":
             let name = parts.count > 1 ? parts[1] : "rec"
             let seconds = parts.count > 2 ? Double(parts[2]) ?? 2 : 2

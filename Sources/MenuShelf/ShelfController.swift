@@ -75,7 +75,12 @@ final class ShelfController {
 
     /// Our items and the assertion change in the same run-loop turn, so
     /// MenuBarAgent lays the bar out in one pass.
+    /// `--no-hide` (investigations): never restrict anything, so tests of
+    /// other mechanisms aren't disturbed.
+    static let noHide = CommandLine.arguments.contains("--no-hide")
+
     func conceal() {
+        guard !Self.noHide else { restriction.set(.off); return }
         state = .concealed
         removeMonitors()
         render()
@@ -83,6 +88,7 @@ final class ShelfController {
     }
 
     func reveal() {
+        guard !Self.noHide else { restriction.set(.off); return }
         state = .revealed
         render()
         revealBaseline = Set(hiddenPIDs().flatMap { MenuTracker.windows(of: $0).map(\.id) })
