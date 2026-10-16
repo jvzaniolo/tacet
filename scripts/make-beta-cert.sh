@@ -13,7 +13,9 @@
 set -euo pipefail
 NAME="${NAME:-Tacet Beta}"
 DAYS="${DAYS:-3650}"
-OUT="${OUT:-$HOME/Documents/Tacet Beta signing.p12}"
+# Not ~/Documents: it may sync to iCloud Drive (review 3.3). Copy the backup
+# to offline storage (an encrypted USB drive or a password manager).
+OUT="${OUT:-$HOME/Library/Application Support/Tacet/signing/$NAME signing.p12}"
 
 if security find-identity -p codesigning | grep -q "\"$NAME\""; then
     echo "\"$NAME\" already exists in the keychain; nothing to do."
@@ -42,11 +44,15 @@ PASS="$(/usr/bin/openssl rand -hex 16)"
 # -T: let codesign use the key without a keychain prompt every build.
 security import "$TMP/cert.p12" -k "$HOME/Library/Keychains/login.keychain-db" \
     -P "$PASS" -T /usr/bin/codesign
+mkdir -p "$(dirname "$OUT")"
+chmod 700 "$(dirname "$OUT")"
 cp "$TMP/cert.p12" "$OUT"
+chmod 600 "$OUT"
 # The backup's password goes into the login keychain (Keychain Access →
 # "<NAME> signing backup"), never to the terminal or a file.
 security add-generic-password -U -s "$NAME signing backup" -a "$(basename "$OUT")" -w "$PASS" \
     -j "Password of the .p12 backup made by Tacet's make-beta-cert.sh"
 echo "Created \"$NAME\" (valid $DAYS days)."
 echo "Backup: $OUT"
-echo "Its password is in Keychain Access, item \"$NAME signing backup\". Keep both private."
+echo "Its password is in Keychain Access, item \"$NAME signing backup\"."
+echo "Copy the .p12 to offline storage and keep it private; don't put it in a synced folder."

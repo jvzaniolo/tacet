@@ -41,22 +41,26 @@ cp Support/Tacet.icns "$APP/Contents/Resources/Tacet.icns"   # from Icon/make-ic
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
 
 # Sign with a stable code-signing identity when there is one (self-signed is
-# fine): SIGN_IDENTITY, else the first identity whose name starts with "Tacet"
-# or "MenuShel" (the certificate made under the old name). Otherwise sign ad
+# fine): SIGN_IDENTITY, else the first identity whose name starts with
+# "Tacet" (e.g. "Tacet Beta" from scripts/make-beta-cert.sh). Otherwise sign ad
 # hoc. Tacet needs no TCC permission; its one grant is the security-scoped
 # bookmark to the Control Center settings file.
 # A self-signed certificate is "not trusted", so `find-identity -v` hides
 # it; list without -v.
-IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning | sed -n -E 's/.*"((Tacet|MenuShel)[^"]*)".*/\1/p' | head -1)}"
+IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning | sed -n -E 's/.*"(Tacet[^"]*)".*/\1/p' | head -1)}"
 if [ "${BETA:-0}" = "1" ] && ! security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
     echo "No \"$IDENTITY\" certificate: run scripts/make-beta-cert.sh first (betas must all share one identity)." >&2
     exit 1
 fi
 if [ -n "$IDENTITY" ] && security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
-    codesign --force --sign "$IDENTITY" --identifier app.gettacet.Tacet "$APP"
+    # Hardened runtime (review 3.1): needed for notarization later, and stops
+    # DYLD_INSERT_LIBRARIES from riding on Tacet's file grant. Tacet loads no
+    # third-party code and dlsym into CoreFoundation is allowed, so no
+    # entitlements are needed.
+    codesign --force --options runtime --sign "$IDENTITY" --identifier app.gettacet.Tacet "$APP"
     echo "Signed with \"$IDENTITY\""
 else
-    codesign --force --sign - --identifier app.gettacet.Tacet "$APP"
+    codesign --force --options runtime --sign - --identifier app.gettacet.Tacet "$APP"
     echo "Signed ad hoc (create a \"Tacet Dev\" code-signing certificate for a stable identity)"
 fi
 
@@ -64,8 +68,9 @@ echo "Built $PWD/$APP"
 
 # Installs to /Applications, where a shipping app lives. Since the switch to
 # the System Settings switches (NOTES §13) nothing requires it any more; the
-# old restriction did (§11 E7). INSTALL=0 skips this step.
-if [ "${INSTALL:-1}" = "1" ]; then
+# old restriction did (§11 E7). Only with INSTALL=1 (or scripts/install.sh):
+# it quits the running Tacet and replaces /Applications/Tacet.app (review 3.2).
+if [ "${INSTALL:-0}" = "1" ]; then
     DEST="/Applications/Tacet.app"
     # A normal quit (SIGTERM) turns hidden apps back on before the swap.
     if pkill -TERM -x Tacet; then sleep 1; fi

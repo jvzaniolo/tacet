@@ -24,8 +24,4 @@ enum MenuTracker {
             return OwnerWindow(id: id, pid: pid, layer: info[kCGWindowLayer as String] as? Int ?? 0, bounds: bounds)
         }
     }
-
-    static func windows(of pid: pid_t) -> [OwnerWindow] {
-        allWindows().filter { $0.pid == pid }
-    }
 }

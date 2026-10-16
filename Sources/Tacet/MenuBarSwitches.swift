@@ -155,7 +155,13 @@ enum MenuBarSwitches {
     // MARK: Writing
 
     /// Sets `isAllowed` for the given apps in one write, on top of a fresh
-    /// read. Apps not in the list are skipped. Returns false if the write
+    /// read.
+    ///
+    /// Read-modify-write of the whole value: a change MenuBarAgent or System
+    /// Settings makes in the ~1 ms between the read and the write (a ⌘-drag,
+    /// a newly tracked app) is lost. cfprefsd has no compare-and-swap, so this
+    /// is accepted (review §4.2); the read-back below catches it when it hits
+    /// `isAllowed`, and `ShelfModel.write` then follows a fresh read. Apps not in the list are skipped. Returns false if the write
     /// couldn't be made or didn't stick.
     @discardableResult
     static func setAllowed(_ changes: [String: Bool]) -> Bool {

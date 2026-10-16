@@ -51,12 +51,12 @@ final class ShelfController {
 
     func reveal(pinned: Bool = false) {
         self.pinned = pinned
-        revealBaseline = Set(hiddenPIDs().flatMap { MenuTracker.windows(of: $0).map(\.id) })
+        let pids = hiddenPIDs()
+        revealBaseline = Set(MenuTracker.allWindows().filter { pids.contains($0.pid) }.map(\.id))
         model.reveal()
         render()
         if pinned { removeMonitors() } else { installMonitors() }
     }
-
 
     private func render() {
         let open = model.revealed
@@ -165,18 +165,20 @@ final class ShelfController {
         }
     }
 
-    private func hiddenPIDs() -> [pid_t] {
+    private func hiddenPIDs() -> Set<pid_t> {
         let hidden = model.hidden
-        return NSWorkspace.shared.runningApplications
+        return Set(NSWorkspace.shared.runningApplications
             .filter { $0.bundleIdentifier.map(hidden.contains) ?? false }
-            .map(\.processIdentifier)
+            .map(\.processIdentifier))
     }
 
     /// Menus (any app) and windows the revealed apps opened since revealing.
+    /// One window-list copy per call (review §5.1).
     private func menuWindows() -> [MenuTracker.OwnerWindow] {
-        let menus = MenuTracker.allWindows().filter(\.isMenu)
-        let popovers = hiddenPIDs().flatMap { MenuTracker.windows(of: $0) }.filter { !revealBaseline.contains($0.id) }
-        return menus + popovers
+        let pids = hiddenPIDs()
+        return MenuTracker.allWindows().filter { window in
+            window.isMenu || (pids.contains(window.pid) && !revealBaseline.contains(window.id))
+        }
     }
 
     private func isInMenu(_ point: NSPoint) -> Bool {

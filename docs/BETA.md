@@ -55,8 +55,10 @@ scripts/make-beta-cert.sh
 ```
 
 It creates the self-signed "Tacet Beta" code-signing identity in the login
-keychain and saves a `.p12` backup in `~/Documents`; its password is in
-Keychain Access as "Tacet Beta signing backup".
+keychain and saves a `.p12` backup in
+`~/Library/Application Support/Tacet/signing/` (not `~/Documents`, which may
+sync to iCloud Drive); its password is in Keychain Access as "Tacet Beta
+signing backup". Copy the `.p12` to offline storage.
 All betas must use this identity: macOS ties the file grant to it.
 
 **Each beta:**
@@ -82,7 +84,7 @@ All betas must use this identity: macOS ties the file grant to it.
    (`/releases/latest` skips prereleases). First release: v0.1.0-beta.1,
    2026-10-16, expires 2026-12-15.
 
-To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/build-app.sh`.
+To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/install.sh`.
 
 ### Updates: manual for now (Sparkle later)
 

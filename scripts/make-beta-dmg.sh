@@ -5,7 +5,7 @@
 #   EXPIRES_DAYS=30 FEEDBACK_URL=mailto:… scripts/make-beta-dmg.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-BETA=1 INSTALL="${INSTALL:-0}" ./scripts/build-app.sh
+BETA=1 INSTALL=0 ./scripts/build-app.sh
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/Tacet.app/Contents/Info.plist)"
 DMG="build/Tacet-$VERSION-beta.dmg"
 STAGE="$(mktemp -d)"
