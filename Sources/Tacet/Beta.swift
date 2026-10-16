@@ -62,21 +62,12 @@ final class BetaExpiredWindowController {
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.center()
-            // Back to a menu-bar-only app when it closes (as Settings does).
             NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
-                MainActor.assumeIsolated { NSApp.setActivationPolicy(.accessory) }
+                MainActor.assumeIsolated { AppFocus.windowClosing(window) }
             }
             self.window = window
         }
-        guard let window else { return }
-        // Same as the Settings window: a regular app can take focus.
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async {
-            NSApp.activate()
-            window.makeKeyAndOrderFront(nil)
-        }
+        if let window { AppFocus.show(window) }
     }
 }
 

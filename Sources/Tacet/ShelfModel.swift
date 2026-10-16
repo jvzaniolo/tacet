@@ -17,12 +17,17 @@ import Observation
 final class ShelfModel {
     enum Status { case visible, hidden, offInSystemSettings }
 
-    struct Row: Identifiable {
+    struct Row: Identifiable, Equatable {
         let bundleID: String
         let name: String
         let icon: NSImage
         let status: Status
         var id: String { bundleID }
+
+        /// The icon follows from the bundle ID, so it isn't compared.
+        static func == (a: Row, b: Row) -> Bool {
+            a.bundleID == b.bundleID && a.name == b.name && a.status == b.status
+        }
     }
 
     private(set) var access: MenuBarSwitches.Access = .notGranted
@@ -102,19 +107,30 @@ final class ShelfModel {
 
     /// Re-reads the switches and folds in changes made in System Settings.
     func refresh() {
-        guard access == .granted else { rows = []; return }
+        guard access == .granted else {
+            if !rows.isEmpty { rows = [] }
+            return
+        }
         guard let current = readSwitches() else {
-            access = MenuBarSwitches.checkAccess()
+            let checked = MenuBarSwitches.checkAccess()
+            if checked != access { access = checked }
             return
         }
         reconcile(current)
     }
 
+    /// "Can't read" is logged when reading starts failing, not on every
+    /// refresh (review §2.2).
+    @ObservationIgnored private var readFailing = false
+
     private func readSwitches() -> [String: Bool]? {
         guard let apps = MenuBarSwitches.read() else {
-            Log.write("Switches: can't read")
+            if !readFailing { Log.write("Switches: can't read") }
+            readFailing = true
             return nil
         }
+        if readFailing { Log.write("Switches: readable again") }
+        readFailing = false
         return Dictionary(apps.filter { $0.bundleID != Self.ownID }.map { ($0.bundleID, $0.isAllowed) },
                           uniquingKeysWith: { a, _ in a })
     }
@@ -142,13 +158,16 @@ final class ShelfModel {
         rebuildRows()
     }
 
+    /// Assigns `rows` only when something changed, so the 1 s refresh in
+    /// Settings doesn't make SwiftUI re-diff an unchanged list (review §2.1).
     private func rebuildRows() {
-        rows = switches.keys.map { id in
+        let new = switches.keys.map { id in
             let info = info(for: id)
             let status: Status = hidden.contains(id) ? .hidden : (switches[id] == true ? .visible : .offInSystemSettings)
             return Row(bundleID: id, name: info.name, icon: info.icon, status: status)
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if new != rows { rows = new }
     }
 
     private func info(for id: String) -> (name: String, icon: NSImage) {

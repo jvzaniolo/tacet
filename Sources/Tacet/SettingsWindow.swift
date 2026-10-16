@@ -8,7 +8,7 @@ import SwiftUI
 final class SettingsWindowController {
     private let model: ShelfModel
     private let ui = SettingsUIState()
-    fileprivate var window: NSWindow?
+    private var window: NSWindow?
     private var timer: Timer?
 
     init(model: ShelfModel) {
@@ -28,46 +28,42 @@ final class SettingsWindowController {
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.isReleasedWhenClosed = false
             window.center()
-            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
+            let center = NotificationCenter.default
+            center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.timer?.invalidate()
-                    self?.timer = nil
-                    self?.windowClosed()
+                    self?.setRefreshing(false)
+                    AppFocus.windowClosing(window)
                 }
+            }
+            center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateRefreshing() }
             }
             self.window = window
         }
-        bringToFront()
-        // There's no change notification for these switches: while the
-        // window is open, re-read them so changes made in System Settings
-        // and newly tracked apps show up.
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.model.refresh() }
-        }
+        if let window { AppFocus.show(window) }
+        updateRefreshing()
     }
-}
 
-extension SettingsWindowController {
-    /// macOS 14+ only hands focus to an agent app (no Dock icon) when another
-    /// app yields it, so a window opened from our status menu came up in front
-    /// but inactive. While the Settings window is open Tacet becomes a regular
-    /// app (Dock icon, like System Settings), which can activate itself; it
-    /// goes back to an agent when the window closes.
-    fileprivate func bringToFront() {
+    /// There's no change notification for these switches: while the window
+    /// is on screen, re-read them every second so changes made in System
+    /// Settings and newly tracked apps show up. Paused while the window is
+    /// hidden, covered or minimized (review §2.1).
+    private func updateRefreshing() {
         guard let window else { return }
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        // The status menu may still be closing: try again on the next turn.
-        DispatchQueue.main.async {
-            NSApp.activate()
-            window.makeKeyAndOrderFront(nil)
-        }
+        setRefreshing(window.isVisible && window.occlusionState.contains(.visible))
     }
 
-    fileprivate func windowClosed() {
-        NSApp.setActivationPolicy(.accessory)
+    private func setRefreshing(_ on: Bool) {
+        if on {
+            guard timer == nil else { return }
+            model.refresh()
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.model.refresh() }
+            }
+        } else {
+            timer?.invalidate()
+            timer = nil
+        }
     }
 }
 
