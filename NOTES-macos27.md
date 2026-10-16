@@ -1182,3 +1182,74 @@ a link to System Settings, never a switch, so they can't be mistaken for
 - **Copy trims (user):** the arrow caption is left-aligned; the "Hide in Tacet"
   subtitle is just "Apps turned on here hide behind Tacet's arrow."; the list
   footer ("Apps appear here after their first time…") is gone.
+
+## 17. Investigation: Tacet moves icons itself (2026-10-16)
+
+**Goal (user):** turning on "Hide in Tacet" moves that app's icons left of
+Tacet's arrow, so the bar is always `[hidden] « [visible]` with no ⌘-drag;
+the same mechanism could place Tacet's own arrow on a new install.
+
+Probe: `TacetLayoutProbe.app` (scratch, own bundle ID), CF container calls as
+in §13. Mechanisms in our own words; no third-party code.
+
+### Route 1: write the order table — **works**
+
+- **Where:** `~/Library/Group Containers/com.apple.MenuBar/Library/Preferences/com.apple.MenuBar.plist`,
+  one key `TrailingItemPreferredPositions` (`status:<bundle ID>::<autosave
+  name>` → weight; larger = further left). A **different** protected
+  container from Control Center's: our existing grant doesn't cover it.
+  Without a grant the folder can't even be listed. The user granted the
+  probe the `Preferences` folder in an open panel (one click).
+- Weights on this Mac: Tacet arrow 446; hidden apps 478–813.5 (left of it);
+  Stats 343–410 and Raycast 209/353 (right of it). The table also holds many
+  stale entries from other experiments.
+
+| Test | Result |
+| --- | --- |
+| A. Live item: Stats' three keys 343/363/410 → 460 while visible | ✅ Stats moved left of Tacet's arrow ~1.5 s after the write, no nudge needed; writing the old weights moved it back |
+| B. Re-allow (Tacet's case): Stats switched off by Tacet, weights → 460, then revealed | ✅ Stats came back **left of the arrow**, at the new position |
+| C. Tacet's own arrow: 446 → 330 → 446 while shown | ✅ the arrow moved live and back |
+| D. Persistence: quit and reopen Stats (still at 460) | ✅ came back left of the arrow; the table kept 460 |
+| MenuBarAgent restart / reboot | Not tested (would disturb the whole bar); the table is the store MenuBarAgent itself writes after a ⌘-drag, so expected to hold |
+
+So the sources' "the agent ignores the table for live items / re-allowed
+items" doesn't hold on 27.0.1: both live and re-allowed items follow it.
+Visible side effects: the normal ~0.45 s slide of a reorder; no flicker, no
+cursor movement.
+
+### Route 2: synthetic ⌘-drag — not tested, not recommended
+
+Needs Accessibility (item frames) and event posting (also gated by
+Accessibility), so it brings back the permission Tacet dropped. The posted
+drag moves the real pointer across the bar, visibly, and fails if the user
+moves the mouse or the item is in the overflow. Route 1 makes it
+unnecessary.
+
+### Route 3: order of switch flips — no
+
+Flipping switches never changes an item's position: re-allowed items
+return to their stored weight (every reveal so far, and test B shows the
+weight is what decides).
+
+### Recommendation
+
+Use Route 1 in Tacet, at the cost of a **second one-time grant** (the
+`com.apple.MenuBar` Preferences folder) in onboarding:
+- On "Hide in Tacet" ON: re-read the table, give each of the app's keys a
+  weight just above the arrow's (between the arrow and the next item to its
+  left, e.g. midpoints so existing order among hidden apps is kept), write
+  once; the app is switched off right after, so the move is invisible.
+- On OFF: move it back just right of the arrow (so it reappears next to
+  where it was hidden), rather than leaving it among the hidden group.
+- On first launch: write the arrow's own weight just below the lowest
+  hidden-app weight, solving the far-left placement without a ⌘-drag; the
+  Arrow Position animation and the "group hidden apps on the left" tip can
+  then go.
+- Keys are per item (`::<autosave name>`); an app with several items needs
+  all its keys moved (Stats has three). Items an app hasn't shown yet have
+  no key: write it when it first appears.
+- Same caveats as the switches: private CF calls, undocumented schema,
+  re-read before every write, re-test on each macOS update.
+
+Restored: Stats' weights back to 343/363/410 (right of the arrow), Tacet's
+arrow back to 446, Stats no longer hidden by Tacet.
