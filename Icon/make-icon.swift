@@ -47,9 +47,9 @@ func chevron(tipX: CGFloat, midY: CGFloat, width: CGFloat, height: CGFloat, line
 }
 
 /// The double chevron «, centred on `center`.
-func doubleChevron(center: CGPoint, size: CGFloat, weight: CGFloat = 0.16) -> (back: CGPath, front: CGPath) {
+func doubleChevron(center: CGPoint, size: CGFloat, weight: CGFloat = 0.16, spacing: CGFloat = 0.30) -> (back: CGPath, front: CGPath) {
     let line = size * weight
-    let w = size * 0.36, h = size * 0.78, gap = size * 0.30
+    let w = size * 0.36, h = size * 0.78, gap = size * spacing
     let total = w + gap
     let left = center.x - total / 2
     let front = chevron(tipX: left, midY: center.y, width: w, height: h, line: line)
@@ -145,7 +145,9 @@ func draw(_ v: Variant, fullBleed: Bool = false, in ctx: CGContext) {
     case .plate: (CGPoint(x: 512, y: 512), 340)
     case .bold: (CGPoint(x: 512, y: 512), 500)
     }
-    let glyph = doubleChevron(center: center, size: size, weight: v == .bold ? 0.20 : 0.16)
+    // Graphite: a little more room between the chevrons, so they read as
+    // two at small sizes (user feedback).
+    let glyph = doubleChevron(center: center, size: size, weight: v == .bold ? 0.20 : 0.16, spacing: v == .graphite ? 0.40 : 0.30)
     let glyphTop = center.y + size * 0.48, glyphBottom = center.y - size * 0.48
 
     /// Frosted white glass: a soft shadow under it, a vertical fill, a bright

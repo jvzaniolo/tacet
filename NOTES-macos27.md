@@ -1318,3 +1318,15 @@ No Apple account, no cost. Details for testers and the release steps:
   code-signing identity, update not quarantined) but not added: a
   third-party framework to embed and sign without Xcode, an EdDSA key and an
   appcast. Beta updates are manual (new DMG); revisit with Developer ID.
+
+## 20. App icon v2: dark glass "Graphite" (2026-10-16)
+
+- Direction from the site ("Glass", always dark). Three variants drawn
+  (graphite, plate, bold); the user chose **graphite** with a wider gap
+  between the chevrons (spacing 0.40 of the glyph size instead of 0.30) so
+  they read as two at small sizes.
+- Icon Composer / layered `.icon`: not used. Neither Icon Composer nor Xcode
+  is installed, both need an Apple ID sign-in to download, and the `.icon`
+  must be compiled by Xcode's `actool`. The `.icns` (full bleed) is the
+  shipped format; macOS adds its own mask and glass edge.
+- Site exports in `Icon/export/` (`Icon/export-site.sh`).
