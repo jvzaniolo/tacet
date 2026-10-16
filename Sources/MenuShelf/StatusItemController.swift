@@ -76,7 +76,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         } else {
             for app in hidden {
                 let icon = app.icon.map(Self.menuIcon)
-                if app.items.count == 1, let only = app.items.first {
+                if app.items.isEmpty {
+                    let item = NSMenuItem(title: "\(app.name) — not on the bar", action: nil, keyEquivalent: "")
+                    item.image = icon
+                    item.isEnabled = false
+                    menu.addItem(item)
+                } else if app.items.count == 1, let only = app.items.first {
                     menu.addItem(pressItem(title: app.name, item: only, icon: icon))
                 } else {
                     let parent = NSMenuItem(title: app.name, action: nil, keyEquivalent: "")
@@ -88,6 +93,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                     parent.submenu = sub
                     menu.addItem(parent)
                 }
+            }
+        }
+
+        let pending = model.appsNeedingRelaunch.filter { $0.pid > 0 }
+        if !pending.isEmpty {
+            menu.addItem(.separator())
+            let header = NSMenuItem(title: "Relaunch to Apply", action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+            for app in pending {
+                let item = NSMenuItem(title: "Relaunch \(app.name)", action: #selector(relaunchApp(_:)), keyEquivalent: "")
+                item.target = self
+                item.image = app.icon.map(Self.menuIcon)
+                item.representedObject = app.key
+                menu.addItem(item)
             }
         }
 
@@ -116,9 +136,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         guard let target = sender.representedObject as? PressTarget else { return }
         // Let our menu finish closing before the other app opens its own.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            let error = AX.press(target.item.element)
+            let error = AX.press(target.item.pressElement)
             Log.write("AXPress \(target.item.displayName) (pid \(target.item.pid)) → \(error.rawValue)")
         }
+    }
+
+    @objc private func relaunchApp(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String,
+              let app = model.listedApps.first(where: { $0.key == key }) else { return }
+        model.relaunch(app)
     }
 
     @objc private func toggleFromMenu() {

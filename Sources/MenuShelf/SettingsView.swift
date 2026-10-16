@@ -52,6 +52,14 @@ struct SettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HidingBackendStatus(hider: model.hider)
+            Label(
+                model.overflowFound
+                    ? "macOS overflow arrow is on the bar\(model.overflowFrame.map { " at x \(Int($0.minX))" } ?? "")."
+                    : "macOS overflow arrow not found (the bar has room for every item).",
+                systemImage: "chevron.left.2"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(16)
     }
@@ -73,7 +81,7 @@ struct SettingsView: View {
     }
 
     private var visibleApps: [MenuBarApp] {
-        showSystem ? model.apps : model.apps.filter { !$0.isSystem }
+        showSystem ? model.listedApps : model.listedApps.filter { !$0.isSystem }
     }
 
     private var list: some View {
@@ -84,15 +92,22 @@ struct SettingsView: View {
                         ItemRow(item: item)
                     }
                 } header: {
-                    AppHeader(app: app, isHidden: Binding(
-                        get: { model.isHidden(app) },
-                        set: { model.setHidden($0, for: app) }
-                    ))
+                    AppHeader(
+                        app: app,
+                        isHidden: Binding(
+                            get: { model.isHidden(app) },
+                            set: { model.setHidden($0, for: app) }
+                        ),
+                        // Un-hiding must always stay possible.
+                        unsupportedReason: model.isHidden(app) ? nil : model.unsupportedReason(for: app),
+                        needsRelaunch: model.appsNeedingRelaunch.contains { $0.key == app.key },
+                        relaunch: { model.relaunch(app) }
+                    )
                 }
             }
         }
         .overlay {
-            if model.apps.isEmpty {
+            if model.listedApps.isEmpty {
                 Text(model.isScanning ? "Scanning…" : "No menu bar items found.")
                     .foregroundStyle(.secondary)
             }
@@ -118,22 +133,40 @@ struct SettingsView: View {
 private struct AppHeader: View {
     let app: MenuBarApp
     @Binding var isHidden: Bool
+    let unsupportedReason: String?
+    let needsRelaunch: Bool
+    let relaunch: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            if let icon = app.icon {
-                Image(nsImage: icon).resizable().frame(width: 22, height: 22)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                if let icon = app.icon {
+                    Image(nsImage: icon).resizable().frame(width: 22, height: 22)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(app.name).font(.headline).foregroundStyle(.primary)
+                    Text(app.bundleID ?? "no bundle ID").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(app.items.isEmpty ? "not on the bar" : "\(app.items.count) item\(app.items.count == 1 ? "" : "s")")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Hidden", isOn: $isHidden)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(unsupportedReason != nil)
+                    .help(unsupportedReason ?? "Hide all of this app's menu bar items")
             }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(app.name).font(.headline).foregroundStyle(.primary)
-                Text(app.bundleID ?? "no bundle ID").font(.caption).foregroundStyle(.secondary)
+            if let unsupportedReason {
+                Text(unsupportedReason).font(.caption).foregroundStyle(.secondary)
             }
-            Spacer()
-            Text("\(app.items.count) item\(app.items.count == 1 ? "" : "s")")
-                .font(.caption).foregroundStyle(.secondary)
-            Toggle("Hidden", isOn: $isHidden)
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            if needsRelaunch {
+                HStack {
+                    Text("Changed. If the bar didn't update, relaunch the app to apply it.")
+                        .font(.caption).foregroundStyle(.orange)
+                    Button("Relaunch \(app.name)", action: relaunch)
+                        .controlSize(.small)
+                }
+            }
         }
         .padding(.vertical, 4)
     }
@@ -155,7 +188,7 @@ private struct ItemRow: View {
                 Text("x \(Int(frame.minX))  w \(Int(frame.width))")
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            Button("Open") { AX.press(item.element) }
+            Button("Open") { AX.press(item.pressElement) }
                 .controlSize(.small)
         }
     }
