@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="Icon/previews/glass-dark.png">
+    <img src="Icon/previews/glass-light.png" alt="Tacet app icon" width="160">
+  </picture>
+</p>
+
 # Tacet
 
 *Tacet*: the musical term for a part that stays silent until its turn.
