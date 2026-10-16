@@ -1275,3 +1275,43 @@ unnecessary for users who grant it.
   `Support/Tacet.icns`. Drawn as a pre-masked squircle, macOS 27 put it on a
   gray plate ("icon jail"); drawn full bleed, macOS masks it itself and adds
   its glass edge. One appearance only (no actool for dark/tinted).
+
+## 19. Free beta distribution (2026-10-16)
+
+No Apple account, no cost. Details for testers and the release steps:
+[docs/BETA.md](docs/BETA.md) (+ `BETA.pt-BR.md`).
+
+- **Signing:** self-signed "Tacet Beta" code-signing identity
+  (`scripts/make-beta-cert.sh`: openssl → login keychain, `-T codesign`;
+  `.p12` backup in `~/Documents`, its password in the keychain item
+  "Tacet Beta signing backup"). `BETA=1` builds refuse to sign with anything
+  else.
+- **The file grant survives:** a new beta build over the old one kept the
+  bookmark (no prompt), and so did switching the certificate from
+  "MenuShel Dev" to "Tacet Beta" for the same bundle ID: the security-scoped
+  bookmark follows the bundle ID/path, not the certificate (it only broke at
+  the rename, §14, when the bundle ID changed). A stable certificate is still
+  kept for a consistent identity across betas (Gatekeeper's "origin", any
+  future TCC grant, Sparkle).
+- **Expiry:** `BETA=1` writes `TacetBetaExpiry` (build date + `EXPIRES_DAYS`,
+  default 60) into Info.plist. Past it, at launch or within 15 min while
+  running, Tacet turns every switch it changed back on, stops hiding, and
+  shows "This Tacet beta has ended" (en/pt-BR/es) with Visit Website
+  (`SITE_URL`, default https://gettacet.com) and Quit. Tested with
+  `EXPIRES_DAYS=0`: window shown, all apps back, journal empty. A window
+  shown at a background launch can't take focus (macOS rule); clicking the
+  arrow brings it forward.
+- **Feedback:** "Send Feedback…" in the menu when `FEEDBACK_URL` is set
+  (beta default https://gettacet.com/feedback, placeholder). Adds only the
+  Tacet version/build and macOS version (query items, or subject/body for a
+  `mailto:`). The beta menu also shows "Beta 0.1.0 · ends <date>".
+- **DMG:** `scripts/make-beta-dmg.sh` → `build/Tacet-<version>-beta.dmg`
+  (Tacet.app + `/Applications` link, DMG signed too). Gatekeeper:
+  `spctl` rejects the app (origin "Tacet Beta"), as expected without
+  notarization: testers use Open Anyway or `xattr -dr com.apple.quarantine`.
+- **Distribution (proposed, not created):** public binaries-only repo
+  `jvzaniolo/tacet-beta` with GitHub Releases (`gh release create … --prerelease`).
+- **Sparkle:** compatible in principle (EdDSA-signed updates, same
+  code-signing identity, update not quarantined) but not added: a
+  third-party framework to embed and sign without Xcode, an EdDSA key and an
+  appcast. Beta updates are manual (new DMG); revisit with Developer ID.

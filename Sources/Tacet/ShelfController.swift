@@ -18,6 +18,8 @@ final class ShelfController {
     private var revealBaseline: Set<CGWindowID> = []
 
     var openSettings: (() -> Void)?
+    /// Beta build past its expiry: the arrow shows the "beta has ended" window.
+    var showExpired: (() -> Void)?
 
     init(model: ShelfModel) {
         self.model = model
@@ -83,6 +85,10 @@ final class ShelfController {
             showMenu()
             return
         }
+        if model.expired {
+            showExpired?()
+            return
+        }
         // Nothing to show yet (no access, or no hidden apps): open Settings.
         guard model.access == .granted, model.hasHiddenApps || model.revealed else {
             openSettings?()
@@ -97,6 +103,15 @@ final class ShelfController {
         let showAll = menu.addItem(withTitle: String(localized: "Keep Open"), action: #selector(menuShowAll), keyEquivalent: "")
         showAll.target = self
         showAll.state = pinned ? .on : .off
+        showAll.isEnabled = !model.expired
+        if BuildInfo.feedbackURL != nil {
+            menu.addItem(withTitle: String(localized: "Send Feedback…"), action: #selector(menuFeedback), keyEquivalent: "").target = self
+        }
+        if BuildInfo.isBeta {
+            menu.addItem(.separator())
+            let beta = menu.addItem(withTitle: String(localized: "Beta \(BuildInfo.shortVersion) · ends \(BuildInfo.expiryText)"), action: nil, keyEquivalent: "")
+            beta.isEnabled = false
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "Quit Tacet"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         arrow.menu = menu
@@ -105,6 +120,7 @@ final class ShelfController {
     }
 
     @objc private func menuSettings() { openSettings?() }
+    @objc private func menuFeedback() { BuildInfo.feedbackURL.map { _ = NSWorkspace.shared.open($0) } }
     @objc private func menuShowAll() { if pinned { conceal() } else { reveal(pinned: true) } }
 
     // MARK: Close rules (like the native overflow arrow)

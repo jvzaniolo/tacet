@@ -6,15 +6,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var shelf = ShelfController(model: model)
     private lazy var settings = SettingsWindowController(model: model)
     private var signalSources: [DispatchSourceSignal] = []
+    private let expiredWindow = BetaExpiredWindowController()
+    private var expiryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("Tacet starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString) from \(Bundle.main.bundlePath)")
         Log.write("Switches supported: \(MenuBarSwitches.isSupported)")
         quitCleanlyOnSignals()
+        if let expiry = BuildInfo.betaExpiry { Log.write("Beta build \(BuildInfo.shortVersion) (\(BuildInfo.build)), expires \(expiry)") }
         model.start()
         shelf.openSettings = { [weak self] in self?.settings.show() }
+        shelf.showExpired = { [weak self] in self?.expiredWindow.show() }
+        if BuildInfo.isExpired {
+            model.expire()
+        }
         shelf.start()
-        if settings.needsWelcome { settings.show() }
+        if model.expired {
+            expiredWindow.show()
+        } else if settings.needsWelcome {
+            settings.show()
+        }
+        watchBetaExpiry()
+    }
+
+    /// A beta that expires while Tacet is running stops hiding at once.
+    private func watchBetaExpiry() {
+        guard BuildInfo.isBeta, !model.expired else { return }
+        expiryTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self, BuildInfo.isExpired else { return }
+                timer.invalidate()
+                self.model.expire()
+                self.shelf.conceal()
+                self.expiredWindow.show()
+            }
+        }
     }
 
     /// Restores the switches on quit, including at logout and shutdown.

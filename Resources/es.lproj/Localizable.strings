@@ -45,3 +45,11 @@
 "Settings…" = "Ajustes…";
 "Keep Open" = "Mantener abierto";
 "Quit Tacet" = "Salir de Tacet";
+
+/* Beta */
+"Send Feedback…" = "Enviar comentarios…";
+"Beta %@ · ends %@" = "Beta %@ · termina el %@";
+"This Tacet beta has ended" = "Esta beta de Tacet ha terminado";
+"Thank you for testing Tacet! This beta ended on %@. Tacet no longer hides anything, and your menu bar apps are all shown again." = "¡Gracias por probar Tacet! Esta beta terminó el %@. Tacet ya no oculta nada y todas las apps de la barra de menús vuelven a mostrarse.";
+"Get the latest version on the Tacet website." = "Descarga la última versión en el sitio web de Tacet.";
+"Visit Website" = "Visitar el sitio web";

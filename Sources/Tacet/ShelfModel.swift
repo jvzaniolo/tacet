@@ -28,6 +28,8 @@ final class ShelfModel {
     private(set) var access: MenuBarSwitches.Access = .notGranted
     private(set) var rows: [Row] = []
     private(set) var revealed = false
+    /// Beta build past its expiry: hide nothing, restore what was hidden.
+    private(set) var expired = false
     private(set) var lastError: String?
 
     private static let ownID = Bundle.main.bundleIdentifier ?? "app.gettacet.Tacet"
@@ -168,10 +170,19 @@ final class ShelfModel {
     }
 
     func conceal() { revealed = false; apply() }
+
+    /// The beta has ended: turn every switch Tacet changed back on, for good.
+    func expire() {
+        expired = true
+        revealed = false
+        Log.write("Beta expired: restoring and no longer hiding")
+        restoreAll()
+    }
     func reveal() { revealed = true; apply() }
 
     /// Brings the switches in line with `hidden` and `revealed`, in one write.
     private func apply() {
+        guard !expired else { restoreAll(); return }
         guard access == .granted, let current = readSwitches() else { rebuildRows(); return }
         reconcile(current)
         var changes: [String: Bool] = [:]

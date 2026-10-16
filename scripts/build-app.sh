@@ -14,6 +14,27 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Tacet"
 cp Support/Info.plist "$APP/Contents/Info.plist"
+
+# Build number and links. Beta builds (BETA=1) also get an expiry date
+# (EXPIRES_DAYS after the build, default 60; 0 = already expired, to test the
+# "beta has ended" window), and sign with the "Tacet Beta" certificate
+# (scripts/make-beta-cert.sh) unless SIGN_IDENTITY says otherwise.
+PB=/usr/libexec/PlistBuddy
+BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M)}"
+$PB -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+SITE_URL="${SITE_URL:-https://gettacet.com}"
+$PB -c "Add :TacetSiteURL string $SITE_URL" "$APP/Contents/Info.plist"
+if [ "${BETA:-0}" = "1" ]; then
+    EXPIRES_DAYS="${EXPIRES_DAYS:-60}"
+    EXPIRY="$(date -u -v+"${EXPIRES_DAYS}"d +%Y-%m-%dT%H:%M:%SZ)"
+    $PB -c "Add :TacetBetaExpiry string $EXPIRY" "$APP/Contents/Info.plist"
+    FEEDBACK_URL="${FEEDBACK_URL:-https://gettacet.com/feedback}"
+    SIGN_IDENTITY="${SIGN_IDENTITY:-Tacet Beta}"
+    echo "Beta build $BUILD_NUMBER, expires $EXPIRY"
+fi
+if [ -n "${FEEDBACK_URL:-}" ]; then
+    $PB -c "Add :TacetFeedbackURL string $FEEDBACK_URL" "$APP/Contents/Info.plist"
+fi
 cp Support/Tacet.icns "$APP/Contents/Resources/Tacet.icns"   # from Icon/make-icns.sh
 # Translations: Resources/<lang>.lproj/Localizable.strings, looked up in the
 # main bundle (String Catalogs need xcstringstool, which only Xcode ships).
@@ -27,6 +48,10 @@ cp -R Resources/*.lproj "$APP/Contents/Resources/"
 # A self-signed certificate is "not trusted", so `find-identity -v` hides
 # it; list without -v.
 IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning | sed -n -E 's/.*"((Tacet|MenuShel)[^"]*)".*/\1/p' | head -1)}"
+if [ "${BETA:-0}" = "1" ] && ! security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
+    echo "No \"$IDENTITY\" certificate: run scripts/make-beta-cert.sh first (betas must all share one identity)." >&2
+    exit 1
+fi
 if [ -n "$IDENTITY" ] && security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
     codesign --force --sign "$IDENTITY" --identifier app.gettacet.Tacet "$APP"
     echo "Signed with \"$IDENTITY\""
