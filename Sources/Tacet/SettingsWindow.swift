@@ -32,6 +32,7 @@ final class SettingsWindowController {
                 MainActor.assumeIsolated {
                     self?.timer?.invalidate()
                     self?.timer = nil
+                    self?.windowClosed()
                 }
             }
             self.window = window
@@ -48,22 +49,25 @@ final class SettingsWindowController {
 }
 
 extension SettingsWindowController {
-    /// An agent app (no Dock icon) isn't brought forward by a plain
-    /// `NSApp.activate()` on macOS 14+: activation is cooperative, and when
-    /// the window opens from our status menu the menu is still closing. So
-    /// activate on the next turn of the run loop, ask the frontmost app to
-    /// hand activation over, and order the window front regardless.
+    /// macOS 14+ only hands focus to an agent app (no Dock icon) when another
+    /// app yields it, so a window opened from our status menu came up in front
+    /// but inactive. While the Settings window is open Tacet becomes a regular
+    /// app (Dock icon, like System Settings), which can activate itself; it
+    /// goes back to an agent when the window closes.
     fileprivate func bringToFront() {
         guard let window else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        // The status menu may still be closing: try again on the next turn.
         DispatchQueue.main.async {
             NSApp.activate()
-            if !NSApp.isActive, let front = NSWorkspace.shared.frontmostApplication, front != .current {
-                NSRunningApplication.current.activate(from: front, options: [])
-            }
-            window.orderFrontRegardless()
-            window.makeKey()
+            window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    fileprivate func windowClosed() {
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
