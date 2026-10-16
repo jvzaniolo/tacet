@@ -19,6 +19,8 @@ final class SettingsWindowController {
 
     func show() {
         model.refresh()
+        ui.animationStart = .now
+        ui.animationRuns = 2
         if window == nil {
             let view = SettingsRoot(model: model, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
@@ -50,6 +52,11 @@ final class SettingsWindowController {
 @Observable
 final class SettingsUIState {
     private static let key = "didOnboard.v3"
+    /// The arrow animation plays twice when the window opens, then waits
+    /// for the play button (one run per click).
+    var animationStart: Date?
+    var animationRuns = 2
+
     var didOnboard = UserDefaults.standard.bool(forKey: key) {
         didSet { UserDefaults.standard.set(didOnboard, forKey: Self.key) }
     }
@@ -62,7 +69,7 @@ private struct SettingsRoot: View {
     var body: some View {
         Group {
             if model.access == .granted && ui.didOnboard {
-                AppListView(model: model)
+                AppListView(model: model, ui: ui)
             } else {
                 WelcomeView(model: model, ui: ui)
             }
@@ -151,6 +158,7 @@ private struct Point: View {
 
 private struct AppListView: View {
     let model: ShelfModel
+    let ui: SettingsUIState
 
     private var managed: [ShelfModel.Row] { model.rows.filter { $0.status != .offInSystemSettings } }
     private var offInSettings: [ShelfModel.Row] { model.rows.filter { $0.status == .offInSystemSettings } }
@@ -161,7 +169,7 @@ private struct AppListView: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
             if model.hasHiddenApps {
-                ArrowPlacementSection()
+                ArrowPlacementSection(ui: ui)
             }
 
             Section {
@@ -244,10 +252,28 @@ private struct AppRow<Accessory: View>: View {
 /// How to put the arrow right of the hidden apps (NOTES §15). On first launch
 /// macOS puts a new item at the far left, and only a ⌘-drag moves it.
 private struct ArrowPlacementSection: View {
+    let ui: SettingsUIState
+
     var body: some View {
         Section {
             VStack(spacing: 10) {
-                DragAnimation()
+                HStack(alignment: .top, spacing: 10) {
+                    DragAnimation(start: ui.animationStart, runs: ui.animationRuns) { finished in
+                        // Back to the static final frame, so the timeline stops.
+                        if ui.animationStart == finished { ui.animationStart = nil }
+                    }
+                    Button {
+                        ui.animationRuns = 1
+                        ui.animationStart = .now
+                    } label: {
+                        Image(systemName: "play.circle")
+                            .font(.system(size: 18))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(Text("Play Animation"))
+                    .accessibilityLabel(Text("Play Animation"))
+                    .padding(.top, 6)
+                }
                 Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -271,6 +297,12 @@ private struct ArrowPlacementSection: View {
 /// frame is a pure function of the time, so it can't loop on itself (a
 /// PhaseAnimator version spun the main thread at 100 %, NOTES §15).
 struct DragAnimation: View {
+    /// When the current playback began; nil = show the final frame.
+    let start: Date?
+    let runs: Int
+    /// Called with `start` once the last run ends.
+    var onFinished: (Date) -> Void = { _ in }
+
     private static let slot: CGFloat = 26
     private static let glyphs = ["circle.hexagongrid.fill", "bolt.horizontal.circle", "cloud.fill"]
     private static let cycle: Double = 4.0
@@ -295,10 +327,27 @@ struct DragAnimation: View {
     }
 
     var body: some View {
-        TimelineView(MotionSchedule(cycle: Self.cycle, moving: Self.moving)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.cycle)
-            let p = Self.pose(t)
-            bar(move: p.move, pointer: p.pointer, held: p.held)
+        Group {
+            if let start {
+                TimelineView(MotionSchedule(start: start, runs: runs, cycle: Self.cycle, moving: Self.moving)) { context in
+                    let elapsed = context.date.timeIntervalSince(start)
+                    // After the last run, rest on the final frame.
+                    let t = elapsed >= Double(runs) * Self.cycle ? Self.cycle : elapsed.truncatingRemainder(dividingBy: Self.cycle)
+                    let p = Self.pose(t)
+                    bar(move: p.move, pointer: p.pointer, held: p.held)
+                }
+            } else {
+                let p = Self.pose(Self.cycle)
+                bar(move: p.move, pointer: p.pointer, held: p.held)
+            }
+        }
+        // A TimelineView keeps waking up even after its schedule ends, so
+        // swap it out for the static frame when playback is over.
+        .task(id: start) {
+            guard let start else { return }
+            let end = start.addingTimeInterval(Double(runs) * Self.cycle + 0.1)
+            try? await Task.sleep(for: .seconds(max(0, end.timeIntervalSinceNow)))
+            if !Task.isCancelled { onFinished(start) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Click « and hold ⌘ to drag the arrow to the right of your hidden apps."))
@@ -355,30 +404,29 @@ struct DragAnimation: View {
     }
 }
 
-/// 30 fps inside the moving spans of a repeating cycle, one frame at each
-/// still span's start. Keeps the animation's CPU near zero while it rests.
+/// 30 fps inside the moving spans of `runs` cycles from `start`, one frame at
+/// each still span's start, then a last frame and nothing more. Keeps the
+/// animation's CPU near zero while it rests and at zero once it's done.
 private struct MotionSchedule: TimelineSchedule {
+    let start: Date
+    let runs: Int
     let cycle: Double
     let moving: [ClosedRange<Double>]
 
     func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
         let fps = mode == .lowFrequency ? 1.0 : 30.0
-        var offsets: [Double] = [0]
-        for span in moving {
-            var t = span.lowerBound
-            while t < span.upperBound { offsets.append(t); t += 1 / fps }
-            offsets.append(span.upperBound)
-        }
-        let base = (startDate.timeIntervalSinceReferenceDate / cycle).rounded(.down) * cycle
-        var cycleStart = base
-        var index = 0
-        return AnyIterator {
-            while true {
-                if index == offsets.count { index = 0; cycleStart += cycle }
-                let date = Date(timeIntervalSinceReferenceDate: cycleStart + offsets[index])
-                index += 1
-                if date >= startDate { return date }
+        var offsets: [Double] = []
+        for run in 0..<max(runs, 0) {
+            let base = Double(run) * cycle
+            offsets.append(base)
+            for span in moving {
+                var t = span.lowerBound
+                while t < span.upperBound { offsets.append(base + t); t += 1 / fps }
+                offsets.append(base + span.upperBound)
             }
         }
+        offsets.append(Double(max(runs, 0)) * cycle)
+        var dates = offsets.map { start.addingTimeInterval($0) }.filter { $0 >= startDate }.makeIterator()
+        return AnyIterator { dates.next() }
     }
 }

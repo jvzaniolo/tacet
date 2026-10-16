@@ -37,6 +37,7 @@
 
 /* Arrow Position */
 "Arrow Position" = "Posición de la flecha";
+"Play Animation" = "Reproducir animación";
 "Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Haz clic en « y mantén pulsada ⌘ para arrastrar la flecha a la derecha de las apps ocultas.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */

@@ -1170,3 +1170,9 @@ a link to System Settings, never a switch, so they can't be mistaken for
   each frame as a pure function of the clock, on a schedule that runs at
   30 fps only while something moves: ~4–7 % CPU with the window open, ~0
   when closed. Tested first in a standalone harness, not in the user's Tacet.
+- **Playback (user):** the animation plays twice each time Settings opens,
+  then rests on its final frame (arrow right of the icons); a ▷ button next
+  to it plays it once more. Once a playback ends the `TimelineView` is
+  swapped for a static frame: a TimelineView kept waking up (~3–4 % CPU) even
+  after its schedule ran out. Idle CPU with Settings open is now ~0 % apart
+  from the 1 s switch refresh.

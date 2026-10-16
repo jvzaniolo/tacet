@@ -37,6 +37,7 @@
 
 /* Arrow Position */
 "Arrow Position" = "Arrow Position";
+"Play Animation" = "Play Animation";
 "Click « and hold ⌘ to drag the arrow to the right of your hidden apps." = "Click « and hold ⌘ to drag the arrow to the right of your hidden apps.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
