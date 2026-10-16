@@ -188,7 +188,7 @@ docs/BETA.md, BETA.pt-BR.md   Tester guide and release steps
 Resources/<lang>.lproj/       Localizable.strings per language (en, pt-BR, es)
 Sources/Tacet/
   main.swift, AppDelegate.swift   Launch, quit-time restore, signal handling
-  AppFocus.swift              Brings Tacet's windows forward (Dock icon while open)
+  AppFocus.swift              Brings Tacet's windows forward, focused
   MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
   ShelfModel.swift            Hidden apps, three states, reconcile, journal
   ShelfController.swift       The arrow, its menu and the close rules
