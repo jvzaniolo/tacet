@@ -196,3 +196,175 @@ resort is a process-targeted click, which MenuShelf doesn't do.
    learn the schema from macOS itself.
 3. Hand MenuShelf a Developer ID or another stable signing identity, so
    rebuilds don't reset the Accessibility grant.
+
+---
+
+## 8. Spike: reusing the native overflow arrow with a spacer (2026-10-16)
+
+**Goal:** a "Hidden Bar on top of Apple's overflow". A wide NSStatusItem
+("spacer") pushes the items to its left into macOS 27's native overflow, so
+Apple's arrow, animation and real hiding do the work. The user sets hidden
+vs. visible with native ⌘-drag.
+
+**Setup:**
+- One Mac: built-in 1800×1169 pt notch display (notch spans x 790–1010).
+  No external display was tested.
+- Tooling (kept in the repo, spike-only):
+  - `Sources/MenuShelf/Spike.swift`: spacer, AX probe, arrow watcher.
+  - `scripts/spike.swift`: sends commands, e.g. `build/spike spacer 300 divider`.
+  - Run MenuShelf with `--spike`, which also turns the VisibleCC hider off.
+- Raw evidence is in `~/Library/Logs/MenuShelf.log` (`SPIKE` lines).
+
+### Verdict: **partially viable**
+
+Hiding works and is native (truly hidden, Apple's arrow, no permissions
+needed for the spacer itself). **Revealing does not feel native.** The
+expanded overflow shows a gap as wide as the spacer, and shrinking the spacer
+to remove the gap makes the icons jump back onto the main bar. The spacer's
+width also has to stay inside a narrow band, or the hidden items become
+unrecoverable or come back on their own.
+
+### What was observed
+
+**(a) Does the arrow appear?** Yes.
+- This bar was already crowded, so the arrow existed before the test (x≈1053,
+  right of the notch).
+- With a 300 pt spacer ⌘-dragged to between Claude and Raycast's text item,
+  the arrow moved to sit right next to the spacer (x 1276).
+- Everything left of the spacer went into overflow: 1Password, Raycast,
+  Now Playing, Stats, Claude.
+- MenuBarAgent's drawn-bar list confirms those items are collapsed under the
+  arrow, not drawn on the bar.
+
+**(b) Which items overflow?** The leftmost ones, nearest the notch or the app
+menus.
+- macOS lays out right to left. The first item that doesn't fit, and
+  everything left of it, go into overflow.
+- A spacer wider than the space left over is that first item. So: everything
+  left of the spacer is hidden, everything right of it stays visible.
+
+**(d) Does the spacer itself overflow?** Yes, always: it is the item that
+doesn't fit.
+
+**Width is not "the bigger the better".** Hidden Bar's 10 000 pt trick does
+not carry over.
+
+| Spacer width | Result on this bar |
+| --- | --- |
+| 200 pt, left of everything | Spacer overflows alone; nothing changes |
+| 300 pt, 600 pt | ✅ Works: spacer + everything left of it in overflow, arrow next to it |
+| 800 pt (repeated twice) | ❌ No arrow at all; all app items gone, only Apple's 7 drawn. Nothing can be revealed |
+| 1200 pt, 4000 pt | ❌ Spacer dropped from the bar; all items return |
+
+- A product would need to compute the width live: just over the free space.
+- On a notch display the free space runs from the spacer's right neighbour to
+  `NSScreen.auxiliaryTopRightArea.minX`.
+- The frontmost app's menus didn't matter here, because the notch is the
+  boundary. Without a notch the boundary is the end of the app menus, so the
+  width would change with every app switch. That causes relayouts, and it is
+  untested.
+
+**(c) Expanding with the spacer present.**
+- Clicking the arrow lays the overflow out **left of the notch, over the app
+  menus**. The user's photo shows ChatGPT, MenuShelf, 1Password, Raycast,
+  Now Playing, Stats and Claude covering the "Arquivo…" menus.
+- **The spacer comes along:** a 300 pt empty gap between the revealed icons
+  and the notch, ending at the spacer's divider line.
+- Some items didn't fit in the expanded area and stayed collapsed
+  (OrbStack at 600 pt).
+- **Shrink on expand** (300→8 pt when the arrow says "Hide…", back to 300 on
+  "Show…"): the gap disappears, but the user saw icons "jump around before
+  settling". The probes explain it:
+  - Apple's expand animation runs first.
+  - Then the shrunken spacer frees space, so the hidden items **reflow onto
+    the main bar** right of the notch (x 1071–1332).
+  - The overflow stays "expanded" with only the items that really don't fit.
+  - On a bar that isn't crowded the arrow would probably disappear entirely
+    at that point (not tested).
+
+**(e) Width vs. frontmost app, notch, external display:** see above. The
+built-in notch display works with a fixed boundary. Non-notch and external
+displays were not tested.
+
+**Initial placement:**
+- A new spacer appears **leftmost** and immediately overflows, hiding nothing.
+- Writing `NSStatusItem Preferred Position MenuShelfSpacer` in our own
+  defaults did **not** move it on macOS 27. Order lives in MenuBarAgent's
+  protected table (§3).
+- **The user must ⌘-drag it into place once.** ⌘-drag worked on the first
+  try, done while the overflow was open. During the drag the arrow vanished
+  for about 0.4 s and came back.
+
+### Open/close behaviour of the native overflow (to copy)
+
+- Opens on click of the arrow. The label switches from "Show Hidden Menu Bar
+  Items" to "Hide Menu Bar Items" (pt-BR here: "Mostrar Itens Ocultos…" /
+  "Ocultar Itens…").
+- **No auto-close timer.** It stayed open for 31 s, 42 s and 116 s untouched.
+- Closes on a click outside, or on the arrow again. Quick re-clicks toggled
+  it within 1–3 s.
+- Each open/close creates and destroys an `AXWindow` in MenuBarAgent
+  (`AXCreated` / `AXUIElementDestroyed`). There is no `AXExpanded` attribute
+  and no actions on the arrow.
+- Expanded icons are drawn left of the notch, over the frontmost app's menus.
+
+### Icon
+
+- MenuBarAgent's binary references `chevron.backward.2` and
+  `chevron.forward.2`.
+- The user's photo of the open overflow shows **»**, so it is
+  `chevron.forward.2` when open and `chevron.backward.2` («) when closed.
+  Thaw's notes call the notchless indicator "Double backward chevron".
+- Use those SF Symbols for our own control.
+
+### ⌘-held divider
+
+- With the spacer in place, the boundary is effectively the native arrow: the
+  spacer itself is hidden inside the overflow.
+- A visible divider only appears while the overflow is open. The divider image
+  (a 1 pt line at the spacer's right edge) is the thin line in the user's
+  photo.
+- Showing it only while ⌘ is held can be done without permissions by polling
+  `NSEvent.modifierFlags` (a class property). A global `flagsChanged` monitor
+  would need Accessibility or Input Monitoring.
+- Whether a dragged icon dropped just left of the collapsed arrow goes into
+  overflow was not tested.
+
+### Permissions per piece (for the $5 / App Store question)
+
+| Piece | Permission |
+| --- | --- |
+| Spacer status item, any width | None (plain `NSStatusItem`) |
+| Native ⌘-drag to configure | None (macOS feature) |
+| Notch boundary for width | None (`NSScreen.auxiliaryTopRightArea`) |
+| Knowing whether the overflow is open | Accessibility (arrow label). **Probably none:** our own spacer's window frame jumps to the left area when expanded (logged `buttonWindow=(454…)` vs `(1277…)`), but this was not tested as a signal. |
+| Right-neighbour position for an exact width | Accessibility, unless derived from our own spacer frame |
+| Reordering items for the user | Protected layout table (file grant or Full Disk Access) or Accessibility + synthetic ⌘-drags. **Not needed** if the user ⌘-drags. |
+| Item images | Screen Recording (not needed here) |
+
+So a **sandboxed, permission-free** build looks possible for "spacer + native
+arrow + ⌘-drag". It is not verified in a sandbox. The cost is the
+reveal experience: a gap, or jumps.
+
+### Recommendation
+
+1. **Don't ship "pure native overflow + spacer" as the headline.** The reveal
+   gap or jump breaks "feels native".
+2. **Fallback (documented, not built):**
+   - Keep the spacer for **hiding**: it's native, permission-free and uses
+     ⌘-drag config. Size it live, inside the safe band.
+   - Add **our own** always-present chevron (`chevron.backward.2` /
+     `chevron.forward.2`) right of the spacer.
+   - Clicking it reveals by shrinking the spacer, so items reflow inline the
+     way Hidden Bar does. Add a spring (bounce) + fade overlay to mask
+     MenuBarAgent's relayout.
+   - Copy the native close rules: click outside or on the chevron, no timer.
+   - Caveat: macOS's own arrow appears whenever the spacer causes overflow, so
+     two chevrons sit side by side while collapsed. Test whether that is
+     acceptable, or whether the spacer can be kept just under the overflow
+     threshold.
+   - The VisibleCC per-app hiding (§2c) is a possible complement for apps that
+     shouldn't even live in the overflow. Its visual effect is still
+     unverified.
+3. Before deciding, test on a **non-notch external display** and on an
+   **uncrowded bar**. The dead-zone widths and the reflow behaviour may differ.

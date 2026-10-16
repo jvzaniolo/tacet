@@ -18,7 +18,18 @@ protocol AppHiding: AnyObject {
 
 @MainActor
 func makeHider() -> AppHiding {
-    VisibleCCHider()
+    // `--spike` keeps other apps' preferences untouched during experiments.
+    CommandLine.arguments.contains("--spike") ? DisabledHider() : VisibleCCHider()
+}
+
+@MainActor
+final class DisabledHider: AppHiding {
+    let isOperational = false
+    let statusText = "Hiding is off (launched with --spike)."
+    let needsRelaunch: Set<String> = []
+    func unsupportedReason(for app: MenuBarApp) -> String? { "Hiding is off (--spike)" }
+    func apply(hiddenKeys: Set<String>, knownApps: [MenuBarApp]) {}
+    func appDidLaunch(bundleID: String) {}
 }
 
 /// Hides an app's items through AppKit's per-item visibility switch.

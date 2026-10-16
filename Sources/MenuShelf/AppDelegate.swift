@@ -7,9 +7,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings: SettingsWindowController!
     private var onboarding: OnboardingController!
     private var rescanTimer: Timer?
+    private var spike: SpikeController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("MenuShelf starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
+        spike = SpikeController()
         model = AppModel(hider: makeHider())
         settings = SettingsWindowController(model: model)
         statusController = StatusItemController(model: model) { [weak self] in self?.settings.show() }

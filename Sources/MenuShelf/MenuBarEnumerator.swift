@@ -43,14 +43,15 @@ enum MenuBarEnumerator {
         /// macOS 27's own overflow arrow (MenuBarAgent), when found.
         var overflowButton: CGRect?
         var overflowFound: Bool
+        var overflowElement: AXUIElement? = nil
     }
 
     static let menuBarAgentBundleID = "com.apple.MenuBarAgent"
 
     /// Walks every running process and collects its `AXExtrasMenuBar` children.
     /// Blocking: call off the main thread. Requires Accessibility.
-    static func enumerate() -> Scan {
-        let ownPID = ProcessInfo.processInfo.processIdentifier
+    static func enumerate(includeOwn: Bool = false) -> Scan {
+        let ownPID = includeOwn ? -1 : ProcessInfo.processInfo.processIdentifier
         let running = NSWorkspace.shared.runningApplications
         let byPID = Dictionary(running.map { ($0.processIdentifier, $0) }, uniquingKeysWith: { a, _ in a })
         // Items grouped by the process that owns them. On macOS 27 a child of
@@ -59,6 +60,7 @@ enum MenuBarEnumerator {
         var itemsByOwner: [pid_t: [MenuBarItem]] = [:]
         var overflowFrame: CGRect?
         var overflowFound = false
+        var overflowElement: AXUIElement?
 
         for app in running where app.processIdentifier != ownPID {
             let pid = app.processIdentifier
@@ -73,6 +75,7 @@ enum MenuBarEnumerator {
             if isAgent, let overflow = AX.element(extras, "AXOverflowButton") {
                 overflowFound = true
                 overflowFrame = frame(of: overflow)
+                overflowElement = overflow
             }
 
             for (index, element) in AX.children(extras).enumerated() {
@@ -81,6 +84,7 @@ enum MenuBarEnumerator {
                 if isAgent, AX.string(element, kAXRoleAttribute) == kAXButtonRole {
                     overflowFound = true
                     overflowFrame = overflowFrame ?? frame(of: element)
+                    overflowElement = overflowElement ?? element
                     continue
                 }
                 var ownerPID: pid_t = 0
@@ -112,10 +116,10 @@ enum MenuBarEnumerator {
             let r = rhs.items.compactMap { $0.frame?.minX }.max() ?? 0
             return l > r
         }
-        return Scan(apps: apps, overflowButton: overflowFrame, overflowFound: overflowFound)
+        return Scan(apps: apps, overflowButton: overflowFrame, overflowFound: overflowFound, overflowElement: overflowElement)
     }
 
-    private static func frame(of element: AXUIElement) -> CGRect? {
+    static func frame(of element: AXUIElement) -> CGRect? {
         guard let p = AX.point(element), let s = AX.size(element) else { return nil }
         return CGRect(origin: p, size: s)
     }
