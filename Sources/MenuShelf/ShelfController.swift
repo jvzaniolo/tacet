@@ -42,10 +42,10 @@ final class ShelfController {
         for item in [chevron, divider] {
             guard let button = item.button else { continue }
             button.target = self
-            // Act on mouse-up so AppKit finishes its own press tracking and
-            // clears the pressed state; acting on mouse-down left a capsule
-            // behind the chevron while revealed.
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            // Act on mouse-down for an instant response. The light capsule
+            // shown while the button is held is macOS's normal press look
+            // and goes away on release.
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             // No pressed capsule: the native overflow arrow has none.
             (button.cell as? NSButtonCell)?.highlightsBy = []
             (button.cell as? NSButtonCell)?.showsStateBy = []

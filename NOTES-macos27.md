@@ -722,9 +722,9 @@ MBAssessmentModeAssertion      -init
   from outside. Our » / « flips instantly on each click.
 - In the same GIF, a newly allowed item (the recorder's ⏹) glides through
   the revealed icons: that is MenuBarAgent re-laying out the bar.
-- The GIF also showed a pressed capsule behind our » while clicking. The
-  native arrow has none. `highlightsBy = []` didn't stop it on 27, so the
-  button's highlight is now also cleared on click (to be confirmed).
+- The GIF also showed a light capsule behind our » while clicking. The user
+  confirmed it only appears while the button is held: it's macOS's normal
+  press look and is left as is. Clicks act on mouse-down for responsiveness.
 
 ### Side-effect options for the user (not implemented)
 
