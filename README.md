@@ -52,9 +52,11 @@ Settings › Menu Bar. macOS does the hiding and the animation, so Notification
 Center, Focus, the camera/mic indicator and Now Playing keep working. Details
 and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
 
-- **Choose apps:** right-click the arrow › **Settings…**. Every app macOS lists
-  under "Allow in the Menu Bar" has a switch; switch an app off to hide it.
-  Apps appear after their first time in the menu bar.
+- **Choose apps:** right-click the arrow › **Settings…**. Under **Hide in
+  Tacet**, every app macOS lists under "Allow in the Menu Bar" has a switch;
+  turn an app **on** to hide it behind the arrow. Apps appear after their
+  first time in the menu bar. Apps turned off in System Settings are listed
+  separately, without a switch.
 - **Show / hide:** click « to show the hidden apps in their real places (menus
   open under them, as usual). Click », anywhere outside the menu bar, or Esc
   with no menu open (Esc only if Tacet has Accessibility, which it doesn't

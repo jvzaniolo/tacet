@@ -1072,3 +1072,59 @@ Leftovers:
   MenuShelf Accessibility entry can be removed in Privacy & Security.
 - `~/Library/Application Support/MenuShelf/` (debug recordings, the §12
   backup) and the `dev.menushelf.MenuShelf` defaults are left in place.
+
+## 15. Arrow position on first launch; "Hide in Tacet" (2026-10-16)
+
+**Bug after the rename:** Tacet's arrow became the leftmost trailing item,
+so revealed apps appeared to its right ("» ChatGPT OrbStack 1Password…").
+
+**Cause (confirmed):** a status item with a never-seen key lands at the far
+left of the trailing items (§8, research/REPORT-overflow.md §1). The new
+bundle ID and autosave name (`status:app.gettacet.Tacet::TacetArrow`) had no
+entry in MenuBarAgent's order table, which lives in the protected
+`~/Library/Group Containers/com.apple.MenuBar` container (§3). MenuShelf's
+position was stored under its old key. **Every new customer starts there.**
+
+**Permission-free placement? No.**
+- Creation order/timing: a new item always lands at the far left.
+- `NSStatusItem Preferred Position <name>` in our own defaults: ignored on
+  macOS 27 (§8).
+- Writing the order table: possible in principle (Thaw does it), but it needs
+  a second file grant (`com.apple.MenuBar`) or Full Disk Access. Not done:
+  one ⌘-drag is less friction than a second open panel.
+
+**What Tacet does instead: an "Arrow Position" step, permission-free.**
+- The bar is right-anchored. Apps revealed to the arrow's *right* push it
+  left by their width; apps revealed to its *left* don't move it. So the
+  arrow's own window x (only x: the window is a zero-height stub) before and
+  after a reveal tells where the hidden apps are:
+  shift > 12 pt → misplaced; |shift| < 4 pt → in place; else inconclusive.
+- **Every reveal** is checked this way (after 0.8 s, once animations settle).
+  Misplaced → Settings opens once per launch at the step.
+- **The step** (Settings, top section, while any app is hidden): a small
+  animated sketch of the bar (the real hidden-app icons, the » moving to
+  their right), three steps (Show Hidden Apps → ⌘-drag » to the right of them →
+  Check Position), and a "Check Position" that hides, reads x, shows, reads x.
+  In place → hides again and the section collapses to a green "The arrow is
+  right of your hidden apps" with Check Again. Stored as `arrowPlaced.v1`.
+- **On this Mac:** the user ⌘-dragged the arrow; Check Position: x 1333
+  concealed, 1333 revealed → in place. After Quit and relaunch the reveal
+  check again gave 1333/1333 → **the position survives a relaunch**.
+- Not yet seen live: the automatic "misplaced" prompt (the arrow was moved
+  before the first check).
+
+**Trade-off with research/REPORT-overflow.md:** the report recommends the
+opposite placement (our arrow *leftmost*, left of every hidden app) because
+MenuBarAgent collapses the leftmost items first: with ours leftmost, a reveal
+that doesn't fit collapses our arrow and the leftmost apps behind Apple's «,
+so only one arrow is ever visible, by construction. **The user prefers the
+arrow on the right with the icons appearing to its left** (like MenuShelf and
+Hidden Bar). Tacet keeps that; the cost is the double arrow of §13 when a
+reveal doesn't fit right of the notch.
+
+**"Hide in Tacet" list (user feedback):** the list header is now "Hide in
+Tacet" with a subtitle "Apps turned on here hide behind Tacet's arrow", and
+the switches are inverted: **on = hidden by Tacet**, off = always visible.
+Apps turned off in System Settings stay in their own section with "Off" and
+a link to System Settings, never a switch, so they can't be mistaken for
+"hidden by Tacet".

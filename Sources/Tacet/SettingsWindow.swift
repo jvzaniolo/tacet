@@ -7,12 +7,14 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let model: ShelfModel
+    private let guide: ArrowGuide
     private let ui = SettingsUIState()
     private var window: NSWindow?
     private var timer: Timer?
 
-    init(model: ShelfModel) {
+    init(model: ShelfModel, guide: ArrowGuide) {
         self.model = model
+        self.guide = guide
     }
 
     var needsWelcome: Bool { model.access != .granted || !ui.didOnboard }
@@ -20,7 +22,7 @@ final class SettingsWindowController {
     func show() {
         model.refresh()
         if window == nil {
-            let view = SettingsRoot(model: model, ui: ui)
+            let view = SettingsRoot(model: model, guide: guide, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Tacet"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -57,12 +59,13 @@ final class SettingsUIState {
 
 private struct SettingsRoot: View {
     let model: ShelfModel
+    let guide: ArrowGuide
     let ui: SettingsUIState
 
     var body: some View {
         Group {
             if model.access == .granted && ui.didOnboard {
-                AppListView(model: model)
+                AppListView(model: model, guide: guide)
             } else {
                 WelcomeView(model: model, ui: ui)
             }
@@ -150,6 +153,7 @@ private struct Point: View {
 
 private struct AppListView: View {
     let model: ShelfModel
+    let guide: ArrowGuide
 
     private var managed: [ShelfModel.Row] { model.rows.filter { $0.status != .offInSystemSettings } }
     private var offInSettings: [ShelfModel.Row] { model.rows.filter { $0.status == .offInSystemSettings } }
@@ -159,24 +163,35 @@ private struct AppListView: View {
             if let error = model.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
+            if model.hasHiddenApps {
+                ArrowPlacementSection(guide: guide, hiddenIcons: managed.filter { $0.status == .hidden }.map(\.icon))
+            }
+
             Section {
                 if managed.isEmpty {
                     Text("No apps yet.").foregroundStyle(.secondary)
                 }
                 ForEach(managed) { row in
                     AppRow(row: row) {
-                        Toggle("Show \(row.name)", isOn: Binding(
-                            get: { row.status == .visible },
-                            set: { model.setHidden(row.bundleID, !$0) }
+                        Toggle("Hide \(row.name) in Tacet", isOn: Binding(
+                            get: { row.status == .hidden },
+                            set: { model.setHidden(row.bundleID, $0) }
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
                     }
                 }
             } header: {
-                Text("Show in the Menu Bar")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Hide in Tacet")
+                    Text("Apps turned on here hide behind Tacet’s arrow. Click « in the menu bar to show them.")
+                        .font(.callout)
+                        .fontWeight(.regular)
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                }
             } footer: {
-                Text("Apps you switch off are hidden. Click « in the menu bar to show them. Apps appear here after their first time in the menu bar.")
+                Text("Apps appear here after their first time in the menu bar.")
                     .foregroundStyle(.secondary)
             }
 
@@ -191,7 +206,7 @@ private struct AppListView: View {
                     Text("Turned Off in System Settings")
                 } footer: {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Tacet doesn’t show these. Turn them on in System Settings to use them.")
+                        Text("Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them.")
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Open Menu Bar Settings…") { NSWorkspace.shared.open(MenuBarSwitches.settingsURL) }
@@ -223,6 +238,106 @@ private struct AppRow<Accessory: View>: View {
             Text(row.name)
             Spacer()
             accessory()
+        }
+    }
+}
+
+// MARK: Arrow position
+
+/// Shown until the arrow is right of the hidden apps (NOTES §15). On first
+/// launch macOS puts a new item at the far left, and only a ⌘-drag moves it.
+private struct ArrowPlacementSection: View {
+    let guide: ArrowGuide
+    let hiddenIcons: [NSImage]
+
+    var body: some View {
+        Section {
+            if guide.state == .inPlace {
+                HStack {
+                    Label("The arrow is right of your hidden apps.", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Spacer()
+                    Button("Check Again") { guide.check() }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    PlacementIllustration(icons: hiddenIcons)
+                        .frame(maxWidth: .infinity)
+                    if guide.state == .misplaced {
+                        Text("Some hidden apps appear to the right of the arrow.")
+                            .foregroundStyle(.orange)
+                    }
+                    Text("1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        if guide.state == .checking {
+                            ProgressView().controlSize(.small)
+                            Text("Checking…").foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Show Hidden Apps") { guide.showForPlacing() }
+                            .disabled(guide.placing || guide.state == .checking)
+                        Button("Check Position") { guide.check() }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(guide.state == .checking)
+                    }
+                }
+            }
+        } header: {
+            Text("Arrow Position")
+        } footer: {
+            if guide.state != .inPlace {
+                Text("New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// A sketch of the menu bar: the arrow moves from the far left to the right
+/// of the hidden apps, as the ⌘-drag should.
+private struct PlacementIllustration: View {
+    let icons: [NSImage]
+
+    private static let slot: CGFloat = 28
+    private var count: Int { max(1, min(icons.count, 4)) }
+
+    var body: some View {
+        PhaseAnimator([false, true]) { placed in
+            HStack(spacing: 14) {
+                ZStack(alignment: .leading) {
+                    HStack(spacing: 10) {
+                        ForEach(0..<count, id: \.self) { i in
+                            icon(i).frame(width: 18, height: 18)
+                        }
+                    }
+                    .offset(x: placed ? 0 : Self.slot)
+                    VStack(spacing: 2) {
+                        Image(systemName: "chevron.forward.2")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 18, height: 18)
+                        Text("⌘").font(.caption2.bold()).opacity(placed ? 0 : 1)
+                    }
+                    .offset(x: placed ? CGFloat(count) * Self.slot : 0, y: 7)
+                }
+                .frame(width: CGFloat(count + 1) * Self.slot - 10, height: 22, alignment: .leading)
+                Image(systemName: "wifi")
+                Image(systemName: "battery.75percent")
+                Text("12:00").font(.system(size: 12))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        } animation: { _ in
+            .easeInOut(duration: 0.9).delay(1.2)
+        }
+    }
+
+    @ViewBuilder private func icon(_ i: Int) -> some View {
+        if i < icons.count {
+            Image(nsImage: icons[i]).resizable()
+        } else {
+            Image(systemName: "app.dashed").resizable()
         }
     }
 }
