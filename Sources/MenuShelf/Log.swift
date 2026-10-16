@@ -8,11 +8,17 @@ enum Log {
     static let fileURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/MenuShelf.log")
 
+    static func timestamp() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f.string(from: Date())
+    }
+
     static func write(_ message: String) {
         print(message)
         fflush(stdout)
         logger.info("\(message, privacy: .public)")
-        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+        let line = "[\(timestamp())] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         if let handle = try? FileHandle(forWritingTo: fileURL) {
             handle.seekToEndOfFile()

@@ -3,9 +3,7 @@ import SwiftUI
 
 /// Permissions window. MenuShelf never changes System Settings itself: it
 /// explains each permission and opens the right pane for the user.
-/// - Accessibility (required): read the bar, find hidden items, open them.
-/// - Screen Recording (optional): real item images in the panel instead of
-///   app icons.
+/// - Accessibility: read item positions when the user finishes editing.
 @MainActor
 final class OnboardingController {
     private var window: NSWindow?
@@ -63,12 +61,6 @@ final class OnboardingController {
         open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     }
 
-    static func openScreenRecordingSettings() {
-        // Same idea: adds MenuShelf to the Screen Recording list.
-        _ = CGRequestScreenCaptureAccess()
-        open("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
-    }
-
     private static func open(_ string: String) {
         if let url = URL(string: string) { NSWorkspace.shared.open(url) }
     }
@@ -78,11 +70,9 @@ final class OnboardingController {
 @Observable
 final class PermissionState {
     var accessibility = false
-    var screenRecording = false
 
     func refresh() {
         accessibility = AX.isTrusted(prompt: false)
-        screenRecording = CGPreflightScreenCaptureAccess()
     }
 }
 
@@ -92,24 +82,16 @@ private struct PermissionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("MenuShelf needs your permission").font(.title2.bold())
+            Text("MenuShelf needs one permission").font(.title2.bold())
             PermissionRow(
                 icon: "accessibility",
                 title: "Accessibility",
                 badge: "Required",
-                text: "Lets MenuShelf find the icons you hid and open them when you click them in its panel.",
+                text: "Lets MenuShelf read where your menu bar icons are when you finish editing the layout, to know which apps you put left of the divider. Hiding itself needs no permission.",
                 granted: state.accessibility,
                 action: OnboardingController.openAccessibilitySettings
             )
-            PermissionRow(
-                icon: "rectangle.dashed.badge.record",
-                title: "Screen Recording",
-                badge: "Optional",
-                text: "Shows the real icons in the panel. Without it MenuShelf shows each app's icon instead. MenuShelf only looks at the menu bar, and only while you edit the layout. You may need to quit and reopen MenuShelf after turning it on.",
-                granted: state.screenRecording,
-                action: OnboardingController.openScreenRecordingSettings
-            )
-            Text("You turn these on yourself in System Settings → Privacy & Security. MenuShelf never changes your settings.")
+            Text("You turn this on yourself in System Settings → Privacy & Security. MenuShelf never changes your settings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {

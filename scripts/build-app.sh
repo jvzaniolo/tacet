@@ -34,3 +34,15 @@ else
 fi
 
 echo "Built $PWD/$APP"
+
+# MenuBarAgent's restriction only treats apps in /Applications as normal
+# apps: run from anywhere else, MenuShelf's own items get hidden too.
+# INSTALL=0 skips this step.
+if [ "${INSTALL:-1}" = "1" ]; then
+    DEST="/Applications/MenuShelf.app"
+    osascript -e 'quit app id "dev.menushelf.MenuShelf"' >/dev/null 2>&1 || true
+    sleep 1
+    rm -rf "$DEST"
+    ditto "$APP" "$DEST"
+    echo "Installed $DEST"
+fi
