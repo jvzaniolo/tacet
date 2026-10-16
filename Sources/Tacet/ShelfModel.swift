@@ -77,7 +77,7 @@ final class ShelfModel {
         reconcile(current)
     }
 
-    /// Turns every app Tacet switched off back on (Quit, Show All).
+    /// Turns every app Tacet switched off back on (Quit).
     @discardableResult
     func restoreAll() -> Bool {
         guard !heldOff.isEmpty else { return true }

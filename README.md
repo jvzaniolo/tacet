@@ -60,7 +60,7 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
 - **Show / hide:** click « to show the hidden apps in their real places (menus
   open under them, as usual). Click », anywhere outside the menu bar, or Esc
   with no menu open (Esc only if Tacet has Accessibility, which it doesn't
-  ask for) to hide them again. Right-click › **Show All** keeps them shown.
+  ask for) to hide them again. Right-click › **Keep Open** keeps them shown until you click the arrow.
 - **Three states:** Visible, Hidden (by Tacet), and Off in System Settings
   (turned off outside Tacet: listed, never turned on by «). Changes made in
   System Settings are respected: turning a hidden app on there makes it

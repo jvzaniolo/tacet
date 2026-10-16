@@ -11,7 +11,7 @@ final class ShelfController {
     private let arrow = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var mouseMonitor: Any?
     private var keyMonitor: Any?
-    /// Show All: stays revealed until the arrow is clicked.
+    /// Keep Open: stays revealed until the arrow is clicked.
     private var pinned = false
     /// Windows the hidden apps had on screen when revealed; newer ones are
     /// their menus or popovers.
@@ -94,7 +94,7 @@ final class ShelfController {
     private func showMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: String(localized: "Settings…"), action: #selector(menuSettings), keyEquivalent: ",").target = self
-        let showAll = menu.addItem(withTitle: String(localized: "Show All"), action: #selector(menuShowAll), keyEquivalent: "")
+        let showAll = menu.addItem(withTitle: String(localized: "Keep Open"), action: #selector(menuShowAll), keyEquivalent: "")
         showAll.target = self
         showAll.state = pinned ? .on : .off
         menu.addItem(.separator())

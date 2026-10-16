@@ -1253,3 +1253,4 @@ Use Route 1 in Tacet, at the cost of a **second one-time grant** (the
 
 Restored: Stats' weights back to 343/363/410 (right of the arrow), Tacet's
 arrow back to 446, Stats no longer hidden by Tacet.
+- **Menu (user):** "Show All" is now **Keep Open** ("Manter Aberto" / "Mantener abierto"): it keeps the hidden apps shown until the arrow is clicked.
