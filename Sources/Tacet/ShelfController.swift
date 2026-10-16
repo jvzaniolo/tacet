@@ -135,7 +135,8 @@ final class ShelfController {
         let open = model.revealed
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         let name = open ? "chevron.forward.2" : "chevron.backward.2"
-        let title = open ? "Hide Menu Bar Apps" : "Show Hidden Menu Bar Apps"
+        // Apple's own labels for its overflow arrow (MenuBarAgent).
+        let title = open ? String(localized: "Hide Menu Bar Items") : String(localized: "Show Hidden Menu Bar Items")
         let image = NSImage(systemSymbolName: name, accessibilityDescription: title)?.withSymbolConfiguration(config)
         image?.isTemplate = true
         arrow.button?.image = image
@@ -167,12 +168,12 @@ final class ShelfController {
 
     private func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
-        let showAll = menu.addItem(withTitle: "Show All", action: #selector(menuShowAll), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Settings…"), action: #selector(menuSettings), keyEquivalent: ",").target = self
+        let showAll = menu.addItem(withTitle: String(localized: "Show All"), action: #selector(menuShowAll), keyEquivalent: "")
         showAll.target = self
         showAll.state = pinned ? .on : .off
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Tacet", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: String(localized: "Quit Tacet"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         arrow.menu = menu
         arrow.button?.performClick(nil)
         arrow.menu = nil

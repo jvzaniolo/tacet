@@ -200,7 +200,7 @@ final class ShelfModel {
         } else {
             // Nothing changed: undo the journal entries this write added.
             heldOff.subtract(offs.filter { switches[$0] == true })
-            lastError = "Tacet couldn’t change the menu bar switches."
+            lastError = String(localized: "Tacet couldn’t change the menu bar switches.")
         }
         Journal.save(heldOff)
         for (id, value) in changes where ok { switches[id] = value }

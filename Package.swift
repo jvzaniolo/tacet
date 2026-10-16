@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Tacet",
+    defaultLocalization: "en",
     platforms: [.macOS("27.0")],
     targets: [
         .executableTarget(

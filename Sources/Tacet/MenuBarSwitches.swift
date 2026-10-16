@@ -93,15 +93,15 @@ enum MenuBarSwitches {
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.propertyList]
         panel.directoryURL = plistURL.deletingLastPathComponent()
-        panel.message = "Select “\(plistURL.lastPathComponent)” and click Grant Access. It holds the “Allow in the Menu Bar” switches."
-        panel.prompt = "Grant Access"
+        panel.message = String(localized: "Select “\(plistURL.lastPathComponent)” and click Grant Access. It holds the “Allow in the Menu Bar” switches.")
+        panel.prompt = String(localized: "Grant Access")
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return checkAccess() }
         guard url.standardizedFileURL.path == plistURL.standardizedFileURL.path else {
             Log.write("Switches: picked \(url.lastPathComponent), not the Control Center file")
             let alert = NSAlert()
-            alert.messageText = "That’s a different file"
-            alert.informativeText = "Select “\(plistURL.lastPathComponent)” in the folder Tacet opens."
+            alert.messageText = String(localized: "That’s a different file")
+            alert.informativeText = String(localized: "Select “\(plistURL.lastPathComponent)” in the folder Tacet opens.")
             alert.runModal()
             return checkAccess()
         }

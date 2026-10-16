@@ -131,8 +131,8 @@ private struct WelcomeView: View {
 
 private struct Point: View {
     let icon: String
-    let title: String
-    let text: String
+    let title: LocalizedStringKey
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -142,6 +142,7 @@ private struct Point: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(text).font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -205,10 +206,10 @@ private struct AppListView: View {
                 } header: {
                     Text("Turned Off in System Settings")
                 } footer: {
-                    HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them.")
                             .foregroundStyle(.secondary)
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
                         Button("Open Menu Bar Settings…") { NSWorkspace.shared.open(MenuBarSwitches.settingsURL) }
                     }
                 }
@@ -222,7 +223,7 @@ private struct AppListView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minHeight: 420)
+        .frame(minHeight: 560)
     }
 }
 

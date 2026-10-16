@@ -88,17 +88,53 @@ changes System Settings itself beyond the switches of the apps you hide.
 code-signing identity whose name starts with "Tacet" or "MenuShel" (the
 certificate made under the old name), else ad hoc.
 
+## Localization
+
+Tacet follows the system language. It ships in English (base), Brazilian
+Portuguese (`pt-BR`) and Spanish (`es`).
+
+- Strings live in `Resources/<lang>.lproj/Localizable.strings`. Keys are the
+  English text as written in the source; `%@` stands for an interpolated
+  value (an app name, a file name). `en.lproj` lists every key.
+- SwiftUI `Text`, `Button`, `Label` and `Toggle` literals are looked up
+  automatically; AppKit strings use `String(localized:)`.
+- A String Catalog (`.xcstrings`) isn't used: compiling one needs
+  `xcstringstool`, which ships with Xcode, not with the Command Line Tools.
+- Use the terms macOS itself uses in that language (System Settings › Menu
+  Bar, "Allow in the Menu Bar", Notification Center, Focus…). They can be
+  read from this Mac, e.g. the `.loctable` files in
+  `/System/Library/ExtensionKit/Extensions/ControlCenterSettings.appex/Contents/Resources/`.
+  Keep "Tacet" untranslated.
+
+**Add a language:**
+1. Copy `Resources/en.lproj` to `Resources/<code>.lproj` (e.g. `fr`, `de`,
+   `pt-PT`) and translate the right-hand side of each line.
+2. Add the code to `CFBundleLocalizations` in `Support/Info.plist`.
+3. Run `scripts/check-localizations.py`: it checks that every string in the
+   source has a key and that every language has exactly the English keys.
+4. Build, then look at each screen in that language without changing the
+   system language:
+
+```bash
+open -n /Applications/Tacet.app --args -AppleLanguages "(fr)"
+```
+
+   Translations run longer than English; check that nothing is cut off.
+
 ## Layout
 
 ```
 Package.swift                 SwiftPM package, one executable target
 Support/Info.plist            Bundle Info.plist (LSUIElement, bundle ID)
 scripts/build-app.sh          Builds, signs and installs to /Applications
+scripts/check-localizations.py  Checks the translations against the source
+Resources/<lang>.lproj/       Localizable.strings per language (en, pt-BR, es)
 Sources/Tacet/
   main.swift, AppDelegate.swift   Launch, quit-time restore, signal handling
   MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
   ShelfModel.swift            Hidden apps, three states, reconcile, journal
   ShelfController.swift       The arrow, its menu and the close rules
+  ArrowGuide.swift            Arrow position check (own frame) for the placement step
   SettingsWindow.swift        Welcome/access step and the app list (SwiftUI)
   MenuTracker.swift           On-screen menus/popovers via CGWindowList
   Log.swift                   Console / unified log / ~/Library/Logs output

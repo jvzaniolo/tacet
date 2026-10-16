@@ -14,6 +14,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Tacet"
 cp Support/Info.plist "$APP/Contents/Info.plist"
+# Translations: Resources/<lang>.lproj/Localizable.strings, looked up in the
+# main bundle (String Catalogs need xcstringstool, which only Xcode ships).
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 
 # Sign with a stable code-signing identity when there is one (self-signed is
 # fine): SIGN_IDENTITY, else the first identity whose name starts with "Tacet"

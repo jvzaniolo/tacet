@@ -1128,3 +1128,23 @@ the switches are inverted: **on = hidden by Tacet**, off = always visible.
 Apps turned off in System Settings stay in their own section with "Off" and
 a link to System Settings, never a switch, so they can't be mistaken for
 "hidden by Tacet".
+
+## 16. Localization (2026-10-16)
+
+- English (base), pt-BR, es; follows the system language
+  (`CFBundleDevelopmentRegion` en, `CFBundleLocalizations` en/pt-BR/es,
+  `defaultLocalization: "en"` in Package.swift).
+- `.lproj/Localizable.strings` copied into the app by the build script, not a
+  String Catalog: the Command Line Tools have no `xcstringstool` (and no
+  `genstrings`), so SwiftPM can't compile `.xcstrings` here.
+  `scripts/check-localizations.py` stands in for the extraction step.
+- Terms taken from this Mac's own `.loctable` files: "Permitir na Barra de
+  Menus" / "Permitir en la barra de menús", "Ajustes do Sistema" / "Ajustes
+  del Sistema", "Central de Notificações" / "centro de notificaciones",
+  "Foco" / "modos de concentración", "Central de Controle" / "centro de
+  control". The arrow's tooltip uses MenuBarAgent's own labels for its
+  overflow arrow ("Show Hidden Menu Bar Items" / "Hide Menu Bar Items" and
+  their translations).
+- Checked with screenshots in each language (`-AppleLanguages`) and with the
+  system in pt-BR: one Spanish heading was truncated in the welcome window;
+  headings now wrap. The Settings window is a bit taller (min 560 pt).

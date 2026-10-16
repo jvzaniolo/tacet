@@ -1,0 +1,54 @@
+/* Tacet: es. Keys are the English text in the source; see README › Localization. */
+
+/* Onboarding */
+"Welcome to Tacet" = "Te damos la bienvenida a Tacet";
+"Tacet uses the macOS switches" = "Tacet usa los ajustes de macOS";
+"It hides apps with the “Allow in the Menu Bar” switches in System Settings › Menu Bar. macOS does the hiding, so Notification Center, Focus and the camera and microphone indicators keep working." = "Oculta apps con el ajuste “Permitir en la barra de menús” de Ajustes del Sistema › Barra de menús. Es macOS quien las oculta, así que el centro de notificaciones, los modos de concentración y los indicadores de cámara y micrófono siguen funcionando.";
+"Hidden apps show as off in System Settings" = "Las apps ocultas aparecen desactivadas en Ajustes del Sistema";
+"Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar." = "Haz clic en « en la barra de menús para recuperarlas. Si algo falla, vuelve a activarlas en Ajustes del Sistema › Barra de menús.";
+"Quitting turns them back on" = "Al salir, vuelven a activarse";
+"Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it." = "Al salir, Tacet vuelve a activar todas las apps que ocultó. Sal de Tacet antes de eliminarlo.";
+"This version of macOS doesn’t offer the switches Tacet needs." = "Esta versión de macOS no ofrece los ajustes que Tacet necesita.";
+"Tacet can change the switches." = "Tacet puede cambiar los ajustes.";
+"Allow Tacet to change the switches" = "Permite que Tacet cambie los ajustes";
+"Tacet lost access to the switches. Apps it hid may still be off: grant access again and Tacet turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar." = "Tacet perdió el acceso a los ajustes. Puede que las apps que ocultó sigan desactivadas: vuelve a concederle acceso y Tacet las activará al salir, o actívalas tú en Ajustes del Sistema › Barra de menús.";
+"macOS keeps the switches in a Control Center settings file. In the next window, select “%@” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it." = "macOS guarda estos ajustes en un archivo del centro de control. En la siguiente ventana, selecciona “%@” (Tacet abre su carpeta) y haz clic en Conceder acceso. Tacet solo cambia los ajustes de “Permitir en la barra de menús” de ese archivo.";
+"Choose Apps to Hide…" = "Elegir apps para ocultar…";
+"Grant Access…" = "Conceder acceso…";
+
+/* File access (open panel and alert) */
+"Select “%@” and click Grant Access. It holds the “Allow in the Menu Bar” switches." = "Selecciona “%@” y haz clic en Conceder acceso. Contiene los ajustes de “Permitir en la barra de menús”.";
+"Grant Access" = "Conceder acceso";
+"That’s a different file" = "Ese es otro archivo";
+"Select “%@” in the folder Tacet opens." = "Selecciona “%@” en la carpeta que abre Tacet.";
+
+/* App list */
+"Hide in Tacet" = "Ocultar en Tacet";
+"Apps turned on here hide behind Tacet’s arrow. Click « in the menu bar to show them." = "Las apps activadas aquí se ocultan tras la flecha de Tacet. Haz clic en « en la barra de menús para mostrarlas.";
+"Hide %@ in Tacet" = "Ocultar %@ en Tacet";
+"No apps yet." = "Aún no hay apps.";
+"Apps appear here after their first time in the menu bar." = "Las apps aparecen aquí tras su primera vez en la barra de menús.";
+"Turned Off in System Settings" = "Desactivadas en Ajustes del Sistema";
+"Off" = "Desactivada";
+"Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them." = "Ocultas por macOS, no por Tacet: « no las muestra. Actívalas en Ajustes del Sistema para usarlas.";
+"Open Menu Bar Settings…" = "Abrir ajustes de la barra de menús…";
+"Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over." = "Consejo: arrastra con ⌘ las apps ocultas al extremo izquierdo de la barra de menús. Así aparecen y desaparecen rápido; en otro sitio, los iconos de al lado se desplazan.";
+"Tacet couldn’t change the menu bar switches." = "Tacet no ha podido cambiar los ajustes de la barra de menús.";
+
+/* Arrow Position */
+"Arrow Position" = "Posición de la flecha";
+"The arrow is right of your hidden apps." = "La flecha está a la derecha de las apps ocultas.";
+"Check Again" = "Volver a comprobar";
+"Some hidden apps appear to the right of the arrow." = "Algunas apps ocultas aparecen a la derecha de la flecha.";
+"1. Click Show Hidden Apps.\n2. Hold ⌘ and drag the » arrow to the right of the apps you hide.\n3. Click Check Position." = "1. Haz clic en Mostrar apps ocultas.\n2. Mantén pulsada ⌘ y arrastra la flecha » a la derecha de las apps que ocultas.\n3. Haz clic en Comprobar posición.";
+"Checking…" = "Comprobando…";
+"Show Hidden Apps" = "Mostrar apps ocultas";
+"Check Position" = "Comprobar posición";
+"New menu bar items start at the far left, and only you can move them. Hidden apps then show up to the left of the arrow." = "Los nuevos ítems de la barra de menús empiezan en el extremo izquierdo y solo tú puedes moverlos. Después, las apps ocultas aparecen a la izquierda de la flecha.";
+
+/* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
+"Show Hidden Menu Bar Items" = "Mostrar los ítems ocultos de la barra de menús";
+"Hide Menu Bar Items" = "Ocultar los ítems de la barra de menús";
+"Settings…" = "Ajustes…";
+"Show All" = "Mostrar todo";
+"Quit Tacet" = "Salir de Tacet";
