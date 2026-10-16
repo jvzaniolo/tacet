@@ -206,6 +206,12 @@ final class ShelfController {
         items.map { item in
             let key = BarReader.key(for: item)
             if let image = images.image(for: key) { return .init(item: item, image: image, isCaptured: true) }
+            if ItemImageCache.canCapture {
+                // Never photographed yet: an empty slot of its width, so at
+                // the swap the real icon just appears instead of morphing.
+                let width = item.frame?.width ?? 24
+                return .init(item: item, image: NSImage(size: NSSize(width: width, height: 24)), isCaptured: true)
+            }
             let icon = NSRunningApplication(processIdentifier: item.pid)?.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
             return .init(item: item, image: icon, isCaptured: false)
         }
@@ -334,6 +340,8 @@ final class ShelfController {
         }
         let planned = Dictionary(panel.itemFrames.map { (BarReader.key(for: $0.item), $0.frame.minX) }, uniquingKeysWith: { a, _ in a })
         Log.write("Reveal: planned vs real " + frames.sorted { $0.value < $1.value }.map { "\($0.key.split(separator: "|").last ?? ""): \(Int(planned[$0.key] ?? -1))→\(Int($0.value))" }.joined(separator: ", "))
+        // These positions were verified settled: the reference for next time.
+        images.rememberPositions(frames)
         panel.moveItems(toAX: frames, duration: 0)
         panel.vanish()
         cover.hide()
@@ -647,8 +655,8 @@ final class ShelfController {
             let screen = BarReader.screen(for: snap.spacer ?? snap.arrow ?? snap.visible.first?.frame, in: BarReader.screens())
             // Only what is really drawn: items still in overflow report the
             // arrow's position, and cropping there would capture the arrow.
+            self.images.rememberOrder(snap.visible + snap.hidden)
             await self.images.capture(snap.visible, on: screen)
-            self.images.rememberOrder(snap.hidden)
             self.spacer.setEditing(false)
             self.spacer.item.length = 300
             self.refresh()

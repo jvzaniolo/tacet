@@ -38,6 +38,12 @@ final class ItemImageCache {
 
     func hasImage(for key: String) -> Bool { image(for: key) != nil }
 
+    /// Records positions measured on a settled layout (by key).
+    func rememberPositions(_ xs: [String: CGFloat]) {
+        for (key, x) in xs { order[key] = x }
+        UserDefaults.standard.set(order, forKey: "itemOrder")
+    }
+
     /// Records the order of the given (visible) items.
     func rememberOrder(_ items: [MenuBarItem]) {
         for item in items { if let x = item.frame?.minX { order[BarReader.key(for: item)] = x } }
@@ -48,7 +54,6 @@ final class ItemImageCache {
     /// The layer has a transparent background, so the images carry no bar
     /// tint and sit cleanly on any background (no boxes behind icons).
     func capture(_ items: [MenuBarItem], on screen: BarReader.ScreenInfo?) async {
-        rememberOrder(items)
         guard Self.canCapture, let screen else { return }
         let onScreen = items.filter { $0.frame.map(screen.containsAX) ?? false }
         do {
