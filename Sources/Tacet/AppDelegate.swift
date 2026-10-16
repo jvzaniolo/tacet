@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Log.write("MenuShelf starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString) from \(Bundle.main.bundlePath)")
+        Log.write("Tacet starting on macOS \(ProcessInfo.processInfo.operatingSystemVersionString) from \(Bundle.main.bundlePath)")
         Log.write("Switches supported: \(MenuBarSwitches.isSupported)")
         quitCleanlyOnSignals()
         model.start()

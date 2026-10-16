@@ -1,6 +1,6 @@
 import AppKit
 
-/// MenuShelf's one status item, an arrow like the native overflow one:
+/// Tacet's one status item, an arrow like the native overflow one:
 /// « when hidden apps are hidden, » while they're shown (NOTES §13).
 ///
 /// Clicking it flips the "Allow in the Menu Bar" switches of the hidden apps
@@ -24,7 +24,7 @@ final class ShelfController {
     }
 
     func start() {
-        arrow.autosaveName = "MenuShelfChevron"
+        arrow.autosaveName = "TacetArrow"
         if let button = arrow.button {
             button.target = self
             button.action = #selector(arrowClicked)
@@ -96,7 +96,7 @@ final class ShelfController {
         showAll.target = self
         showAll.state = pinned ? .on : .off
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit MenuShelf", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Tacet", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         arrow.menu = menu
         arrow.button?.performClick(nil)
         arrow.menu = nil
@@ -121,7 +121,7 @@ final class ShelfController {
             }
         }
         // macOS delivers global key events only to apps the user trusted
-        // for Accessibility. MenuShelf doesn't ask for it, so Esc works only
+        // for Accessibility. Tacet doesn't ask for it, so Esc works only
         // where it was granted anyway.
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
@@ -168,7 +168,7 @@ final class ShelfController {
 
     private func isAnyMenuOpen() -> Bool { !menuWindows().isEmpty }
 
-    /// Quit: every app MenuShelf switched off is turned back on.
+    /// Quit: every app Tacet switched off is turned back on.
     func prepareForTermination() {
         removeMonitors()
         let ok = model.restoreAll()

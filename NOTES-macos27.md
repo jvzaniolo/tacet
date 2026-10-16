@@ -1,5 +1,10 @@
 # Menu bar management on macOS 27: notes
 
+> **The product is now called Tacet** (bundle ID `app.gettacet.Tacet`,
+> `/Applications/Tacet.app`, `~/Library/Logs/Tacet.log`). It was called
+> MenuShelf (`dev.menushelf.MenuShelf`) until 2026-10-16; the sections below
+> keep that name as history. See §14 for the rename.
+
 Written 2026-10-16 on macOS 27.0.1 (26A434). Sources:
 
 - What this Mac shows: processes, defaults domains, and AX output from MenuShelf.
@@ -1028,3 +1033,42 @@ Options for the user: (1) keep both arrows; (2) optional Accessibility:
 when the native arrow appears on reveal, open it automatically and hide our
 arrow, so one arrow shows and the extra icons go left of the notch; (3)
 reveal only what fits (also needs Accessibility, for item widths).
+
+## 14. Renamed to Tacet (2026-10-16)
+
+The user named the product **Tacet** (the musical term: the part stays
+silent until its turn). Bundle ID `app.gettacet.Tacet` (the domain will
+probably be gettacet.app; tacet.app is taken).
+
+- Renamed: package/target/executable (`Sources/Tacet`), `build/Tacet.app`,
+  `/Applications/Tacet.app`, Info.plist names, window and menu texts,
+  `~/Library/Logs/Tacet.log`, unified log subsystem `app.gettacet.Tacet`,
+  `~/Library/Application Support/Tacet/journal.plist`, codesign
+  `--identifier`, the status item autosave name (`TacetArrow`).
+- The build script now quits a running Tacet with SIGTERM (its handler turns
+  hidden apps back on); the old `osascript quit` didn't stop the agent app. It
+  signs with `SIGN_IDENTITY`, else an identity named "Tacet…" or "MenuShel…".
+
+### Migration on this Mac
+
+1. MenuShelf had nothing switched off (journal empty after the SIGTERM test).
+2. `hiddenApps.v3` and `didOnboard.v3` copied from `dev.menushelf.MenuShelf`
+   to `app.gettacet.Tacet` defaults.
+3. **The bookmark doesn't carry over:** copied as is, Tacet logged "the
+   saved access no longer resolves" (a security-scoped bookmark is bound to the
+   app that made it). It was removed so Tacet showed the normal welcome, and
+   the user granted access again. The first relaunch after the grant reported
+   it stale and refreshed it, as in §13.
+4. `/Applications/MenuShelf.app` moved to the Trash.
+5. Verified by the user: with the migrated list Tacet hid the same 5 apps,
+   « / » work, each write `synced true, verified true`.
+
+Leftovers:
+- **System Settings › Menu Bar keeps a `dev.menushelf.MenuShelf` entry**
+  (still in `trackedApplications` after the rename, switch on). It doesn't
+  disappear on its own right away; Tacet lists it like any other app.
+  Tacet's own entry wasn't in the list yet at first launch.
+- **TCC:** the new bundle ID starts with no grants. Tacet needs none; the old
+  MenuShelf Accessibility entry can be removed in Privacy & Security.
+- `~/Library/Application Support/MenuShelf/` (debug recordings, the §12
+  backup) and the `dev.menushelf.MenuShelf` defaults are left in place.

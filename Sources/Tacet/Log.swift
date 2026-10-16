@@ -2,11 +2,11 @@ import Foundation
 import os
 
 /// Debug output goes to stdout (when run from a terminal), the unified log,
-/// and ~/Library/Logs/MenuShelf.log (when launched with `open`).
+/// and ~/Library/Logs/Tacet.log (when launched with `open`).
 enum Log {
-    private static let logger = Logger(subsystem: "dev.menushelf.MenuShelf", category: "app")
+    private static let logger = Logger(subsystem: "app.gettacet.Tacet", category: "app")
     static let fileURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/MenuShelf.log")
+        .appendingPathComponent("Library/Logs/Tacet.log")
 
     static func timestamp() -> String {
         let f = DateFormatter()

@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 ///   preferences: a binary plist inside a Data value, an array of alternating
 ///   `{bundle: {_0: id}}` keys and `{isAllowed, location, menuItemLocations}`
 ///   values. A switch is the `isAllowed` flag.
-/// - Access: the user selects the plist once in an open panel; MenuShelf keeps
+/// - Access: the user selects the plist once in an open panel; Tacet keeps
 ///   a security-scoped bookmark.
 /// - Reads and writes go through CoreFoundation's container-aware preference
 ///   calls (private, looked up by name), so MenuBarAgent sees a write within
@@ -101,7 +101,7 @@ enum MenuBarSwitches {
             Log.write("Switches: picked \(url.lastPathComponent), not the Control Center file")
             let alert = NSAlert()
             alert.messageText = "That’s a different file"
-            alert.informativeText = "Select “\(plistURL.lastPathComponent)” in the folder MenuShelf opens."
+            alert.informativeText = "Select “\(plistURL.lastPathComponent)” in the folder Tacet opens."
             alert.runModal()
             return checkAccess()
         }

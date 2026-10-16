@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The one MenuShelf window: the welcome and access step until the user has
+/// The one Tacet window: the welcome and access step until the user has
 /// granted access, then the list of apps (in the style of System Settings ›
 /// Menu Bar › Allow in the Menu Bar).
 @MainActor
@@ -22,7 +22,7 @@ final class SettingsWindowController {
         if window == nil {
             let view = SettingsRoot(model: model, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "MenuShelf"
+            window.title = "Tacet"
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.isReleasedWhenClosed = false
             window.center()
@@ -79,31 +79,31 @@ private struct WelcomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Welcome to MenuShelf").font(.title2.bold())
-            Point(icon: "switch.2", title: "MenuShelf uses the macOS switches",
+            Text("Welcome to Tacet").font(.title2.bold())
+            Point(icon: "switch.2", title: "Tacet uses the macOS switches",
                   text: "It hides apps with the “Allow in the Menu Bar” switches in System Settings › Menu Bar. macOS does the hiding, so Notification Center, Focus and the camera and microphone indicators keep working.")
             Point(icon: "eye.slash", title: "Hidden apps show as off in System Settings",
                   text: "Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar.")
             Point(icon: "arrow.uturn.backward", title: "Quitting turns them back on",
-                  text: "Quitting MenuShelf turns every app it hid back on. Quit MenuShelf before you delete it.")
+                  text: "Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it.")
 
             Divider()
 
             if !MenuBarSwitches.isSupported {
-                Label("This version of macOS doesn’t offer the switches MenuShelf needs.", systemImage: "exclamationmark.triangle")
+                Label("This version of macOS doesn’t offer the switches Tacet needs.", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
             } else if model.access == .granted {
-                Label("MenuShelf can change the switches.", systemImage: "checkmark.circle.fill")
+                Label("Tacet can change the switches.", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Allow MenuShelf to change the switches").font(.headline)
+                    Text("Allow Tacet to change the switches").font(.headline)
                     if model.access == .lost {
-                        Text("MenuShelf lost access to the switches. Apps it hid may still be off: grant access again and MenuShelf turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar.")
+                        Text("Tacet lost access to the switches. Apps it hid may still be off: grant access again and Tacet turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar.")
                             .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("macOS keeps the switches in a Control Center settings file. In the next window, select “\(MenuBarSwitches.plistURL.lastPathComponent)” (MenuShelf opens its folder) and click Grant Access. MenuShelf changes only the “Allow in the Menu Bar” switches in it.")
+                    Text("macOS keeps the switches in a Control Center settings file. In the next window, select “\(MenuBarSwitches.plistURL.lastPathComponent)” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +191,7 @@ private struct AppListView: View {
                     Text("Turned Off in System Settings")
                 } footer: {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("MenuShelf doesn’t show these. Turn them on in System Settings to use them.")
+                        Text("Tacet doesn’t show these. Turn them on in System Settings to use them.")
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Open Menu Bar Settings…") { NSWorkspace.shared.open(MenuBarSwitches.settingsURL) }

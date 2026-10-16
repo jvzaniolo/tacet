@@ -1,17 +1,17 @@
 import AppKit
 import Observation
 
-/// What MenuShelf hides and what it has switched off (NOTES §13).
+/// What Tacet hides and what it has switched off (NOTES §13).
 ///
 /// Three states per app in `trackedApplications`:
-/// - Visible: not in `hidden`, switch on. MenuShelf leaves it alone.
+/// - Visible: not in `hidden`, switch on. Tacet leaves it alone.
 /// - Hidden: in `hidden`. Switch off while concealed, on while revealed.
 /// - Off in System Settings: not in `hidden`, switch off. The user turned it
-///   off in macOS; MenuShelf never turns it on.
+///   off in macOS; Tacet never turns it on.
 ///
-/// The journal (`heldOff`) is the set of apps whose switch MenuShelf has
+/// The journal (`heldOff`) is the set of apps whose switch Tacet has
 /// turned off. It is saved before every write that turns one off, so after a
-/// crash the next launch knows which "off" switches are MenuShelf's.
+/// crash the next launch knows which "off" switches are Tacet's.
 @MainActor
 @Observable
 final class ShelfModel {
@@ -30,7 +30,7 @@ final class ShelfModel {
     private(set) var revealed = false
     private(set) var lastError: String?
 
-    private static let ownID = Bundle.main.bundleIdentifier ?? "dev.menushelf.MenuShelf"
+    private static let ownID = Bundle.main.bundleIdentifier ?? "app.gettacet.Tacet"
     private static let hiddenKey = "hiddenApps.v3"
 
     /// The user's choice: apps hidden behind «.
@@ -77,7 +77,7 @@ final class ShelfModel {
         reconcile(current)
     }
 
-    /// Turns every app MenuShelf switched off back on (Quit, Show All).
+    /// Turns every app Tacet switched off back on (Quit, Show All).
     @discardableResult
     func restoreAll() -> Bool {
         guard !heldOff.isEmpty else { return true }
@@ -118,9 +118,9 @@ final class ShelfModel {
     }
 
     /// Respect what the user did in System Settings:
-    /// - An app MenuShelf held off that is now on was turned on by the user:
+    /// - An app Tacet held off that is now on was turned on by the user:
     ///   it becomes Visible.
-    /// - A hidden app that is off although MenuShelf didn't turn it off was
+    /// - A hidden app that is off although Tacet didn't turn it off was
     ///   turned off by the user: it becomes Off in System Settings.
     private func reconcile(_ current: [String: Bool]) {
         switches = current
@@ -134,7 +134,7 @@ final class ShelfModel {
         }
         for id in hidden where current[id] == false && !heldOff.contains(id) {
             hidden.remove(id)
-            Log.write("Reconcile: \(id) was turned off in System Settings; MenuShelf won't turn it on")
+            Log.write("Reconcile: \(id) was turned off in System Settings; Tacet won't turn it on")
         }
         if changed { Journal.save(heldOff) }
         rebuildRows()
@@ -200,7 +200,7 @@ final class ShelfModel {
         } else {
             // Nothing changed: undo the journal entries this write added.
             heldOff.subtract(offs.filter { switches[$0] == true })
-            lastError = "MenuShelf couldn’t change the menu bar switches."
+            lastError = "Tacet couldn’t change the menu bar switches."
         }
         Journal.save(heldOff)
         for (id, value) in changes where ok { switches[id] = value }
@@ -209,11 +209,11 @@ final class ShelfModel {
     }
 }
 
-/// `~/Library/Application Support/MenuShelf/journal.plist`: the apps whose
-/// switch MenuShelf turned off. Written atomically before each such write.
+/// `~/Library/Application Support/Tacet/journal.plist`: the apps whose
+/// switch Tacet turned off. Written atomically before each such write.
 enum Journal {
     static var url: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MenuShelf/journal.plist")
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Tacet/journal.plist")
     }
 
     static func load() -> Set<String> {

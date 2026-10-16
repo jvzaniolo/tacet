@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "MenuShelf",
+    name: "Tacet",
     platforms: [.macOS("27.0")],
     targets: [
         .executableTarget(
-            name: "MenuShelf",
-            path: "Sources/MenuShelf",
+            name: "Tacet",
+            path: "Sources/Tacet",
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("AppKit"),
