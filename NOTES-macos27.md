@@ -712,6 +712,20 @@ MBAssessmentModeAssertion      -init
   Hiding needs none. No Screen Recording.
 - **Quit:** invalidating our assertions shows everything again.
 
+### Rapid on/off (user GIF, 11:45)
+
+- Two quick clicks now send exactly two changes: show at once, then hide
+  0.36 s later.
+- Even so, MenuBarAgent completes its ~0.5 s reveal before it starts the
+  conceal, so a fast on/off takes about 1 s in total and reads as a short
+  pause. This is MenuBarAgent's queueing; we can't interrupt its animation
+  from outside. Our » / « flips instantly on each click.
+- In the same GIF, a newly allowed item (the recorder's ⏹) glides through
+  the revealed icons: that is MenuBarAgent re-laying out the bar.
+- The GIF also showed a pressed capsule behind our » while clicking. The
+  native arrow has none. `highlightsBy = []` didn't stop it on 27, so the
+  button's highlight is now also cleared on click (to be confirmed).
+
 ### Side-effect options for the user (not implemented)
 
 1. **Accept them.** Document that NC/camera/Focus/Now Playing are unavailable

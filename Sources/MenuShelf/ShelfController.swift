@@ -158,7 +158,18 @@ final class ShelfController {
         }
     }
 
+    /// The native overflow arrow shows no pressed capsule; on macOS 27
+    /// `highlightsBy = []` alone doesn't stop it, so also clear the
+    /// highlight as soon as the click arrives and again after the layout pass.
+    private func clearHighlight(_ item: NSStatusItem) {
+        item.button?.highlight(false)
+        item.button?.isHighlighted = false
+        DispatchQueue.main.async { item.button?.highlight(false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { item.button?.highlight(false) }
+    }
+
     @objc private func chevronClicked() {
+        clearHighlight(chevron)
         if let event = NSApp.currentEvent, event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
             showMenu()
             return
@@ -171,6 +182,7 @@ final class ShelfController {
     }
 
     @objc private func dividerClicked() {
+        clearHighlight(divider)
         if state == .editing { finishEditing() }
     }
 
