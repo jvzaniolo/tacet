@@ -20,11 +20,14 @@ final class CoverWindow {
     }
 
     var isShown: Bool { window.isVisible }
+    /// Bumped on every show, so a late hide can't remove a newer cover.
+    private var generation = 0
 
     /// Shows `image` over `rectAX` (AX coordinates). Returns false without an image.
     @discardableResult
     func show(_ image: NSImage?, over rectAX: CGRect, fadeIn: TimeInterval = 0) -> Bool {
         guard let image else { return false }
+        generation += 1
         imageView.image = image
         window.setFrame(BarReader.cocoaRect(rectAX), display: true)
         window.alphaValue = fadeIn > 0 ? 0 : 1
@@ -41,13 +44,15 @@ final class CoverWindow {
     func hide(fade: TimeInterval = 0) {
         guard window.isVisible else { return }
         guard fade > 0 else { window.orderOut(nil); return }
+        let shown = generation
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = fade
             window.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                self?.window.orderOut(nil)
-                self?.window.alphaValue = 1
+                guard let self, self.generation == shown else { return }
+                self.window.orderOut(nil)
+                self.window.alphaValue = 1
             }
         })
     }

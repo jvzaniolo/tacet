@@ -70,7 +70,11 @@ private final class CatcherView: NSView {
         // Must not be fully transparent, or clicks fall through to the bar.
         NSColor.black.withAlphaComponent(0.005).setFill()
         bounds.fill()
-        guard isOpen else { return }
+        if !isOpen {
+            // Closing: « drawn until macOS's own arrow is back underneath.
+            cover?.draw(in: bounds)
+            return
+        }
         if let cover {
             cover.draw(in: bounds)
             return

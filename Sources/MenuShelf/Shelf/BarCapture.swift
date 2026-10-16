@@ -16,6 +16,9 @@ final class BarCapture {
     private(set) var backgroundRectAX: CGRect = .zero
     /// The patch under macOS's « arrow, mirrored: » on the bar background.
     private(set) var expandedArrow: NSImage?
+    /// The same patch unmirrored: «, drawn while closing until macOS's own
+    /// arrow is back, so the arrow flips the moment you click.
+    private(set) var collapsedArrow: NSImage?
     private var lastCapture = Date.distantPast
     private var capturing = false
     private var captureStarted = Date.distantPast
@@ -65,6 +68,7 @@ final class BarCapture {
                 if updateArrow, let arrow, let patch = backgroundPatch(for: ArrowCatcher.coverRectAX(for: arrow)),
                    let cg = patch.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                     expandedArrow = Self.mirrored(cg, size: patch.size)
+                    collapsedArrow = patch
                 }
             } catch {
                 Log.write("Bar capture failed: \(error.localizedDescription)")

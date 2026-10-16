@@ -305,7 +305,7 @@ final class ShelfController {
     private func beginReveal(token: Int, arrow: CGRect) {
         guard phase == .panel, token == phaseToken else { return }
         let rect = coverRectAX(arrow: arrow)
-        guard cover.show(barCapture.backgroundPatch(for: rect), over: rect) else {
+        guard cover.show(barCapture.backgroundPatch(for: rect), over: rect, fadeIn: 0.1) else {
             Log.write("Reveal: no bar capture (Screen Recording off?); staying in panel mode")
             return
         }
@@ -320,14 +320,24 @@ final class ShelfController {
         let parked = Dictionary(hidden.compactMap { item in MenuBarEnumerator.frame(of: item.element).map { (BarReader.key(for: item), $0.minX) } },
                                 uniquingKeysWith: { a, _ in a })
         let started = Date()
-        spacer.setRevealed(true)
-        waitForLayout(of: hidden, parked: parked, since: started) { [weak self] frames in
+        // Let the cover fade in fully before anything moves underneath.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.11) { [weak self] in
             guard let self, token == self.phaseToken else { return }
+            self.spacer.setRevealed(true)
+            self.waitForLayout(of: hidden, parked: parked, since: Date()) { [weak self] frames in
+                self?.revealSettled(frames: frames, items: hidden, token: token, started: started)
+            }
+        }
+    }
+
+    private func revealSettled(frames: [String: CGFloat], items hidden: [MenuBarItem], token: Int, started: Date) {
+        do {
+            guard token == phaseToken else { return }
             // AX reports the final layout at once; macOS animates to it for
             // ~0.3 s more. Swap only once that animation is over.
-            let wait = max(0, 0.45 - Date().timeIntervalSince(started))
-            DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
-                guard token == self.phaseToken else { return }
+            let wait = max(0, 0.56 - Date().timeIntervalSince(started))
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+                guard let self, token == self.phaseToken else { return }
                 self.completeReveal(frames: frames, items: hidden, since: started)
             }
         }
@@ -341,6 +351,7 @@ final class ShelfController {
         let token = phaseToken
         phase = .closing
         removeMonitors()
+        catcher.setOpen(false, cover: barCapture.collapsedArrow)
         spacer.setRevealed(false)
         panel.close(animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -548,6 +559,8 @@ final class ShelfController {
         phaseToken += 1
         let token = phaseToken
         removeMonitors()
+        // The arrow flips the moment you close, like the native one.
+        catcher.setOpen(false, cover: barCapture.collapsedArrow)
         let length = spacer.length
         Task { @MainActor in
             let snap = await Task.detached { BarReader.snapshot(spacerLength: length) }.value
