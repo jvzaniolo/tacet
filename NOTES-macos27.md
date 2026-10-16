@@ -1001,4 +1001,30 @@ installs there, as a shipping app would live there.
 On the notch display with a wide app menu (Chrome), the revealed apps don't
 fit, so MenuBarAgent shows its own overflow arrow next to ours: two »
 arrows. The user wants MenuShelf to manage that instead (no native arrow;
-the extra icons go left of the notch). Under investigation.
+the extra icons go left of the notch).
+
+What was checked:
+- **No setting turns it off.** `com.apple.MenuBarAgent` defaults hold only
+  `TrailingItemPreferredPositions` (ordering) and analytics. The overflow
+  names in MenuBarAgent's binary (`allowsOverflow`, `minimumItemsForOverflow`,
+  `overflowIndicatorWidth`, `dropPriority`, `expandedLayouts`, …) sit among the
+  fields of its layout engine's per-item input, not among preference keys.
+  Whether an item may overflow is decided inside MenuBarAgent.
+- **When it appears:** whenever the trailing items don't fit right of the
+  notch. Revealing adds the hidden apps there, so a full bar overflows. The
+  frontmost app's menus don't matter for *whether* it overflows; they only get
+  covered when the overflow is expanded.
+- **Only MenuBarAgent places items.** Third-party apps can't position other
+  apps' items. "Left of the notch, over the app menus" is exactly the
+  native *expanded* overflow, which only a click on the native arrow opens.
+- **Automating it needs Accessibility.** Finding the arrow works through AX
+  (§4), but the arrow has **no AX actions** (§8), so opening it would take a
+  synthetic click (event posting, also Accessibility). Its open state shows
+  in its AX label.
+- **Without a permission** MenuShelf can't tell that the arrow is there. Its
+  own item's frame only changes when that item itself overflows (§9).
+
+Options for the user: (1) keep both arrows; (2) optional Accessibility:
+when the native arrow appears on reveal, open it automatically and hide our
+arrow, so one arrow shows and the extra icons go left of the notch; (3)
+reveal only what fits (also needs Accessibility, for item widths).
