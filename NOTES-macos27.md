@@ -1309,12 +1309,12 @@ No Apple account, no cost. Details for testers and the release steps:
   default 60) into Info.plist. Past it, at launch or within 15 min while
   running, Tacet turns every switch it changed back on, stops hiding, and
   shows "This Tacet beta has ended" (en/pt-BR/es) with Visit Website
-  (`SITE_URL`, default https://gettacet.com) and Quit. Tested with
+  (`SITE_URL`, default https://gettacet.pages.dev; gettacet.com belongs to someone else) and Quit. Tested with
   `EXPIRES_DAYS=0`: window shown, all apps back, journal empty. A window
   shown at a background launch can't take focus (macOS rule); clicking the
   arrow brings it forward.
 - **Feedback:** "Send Feedback…" in the menu when `FEEDBACK_URL` is set
-  (beta default https://gettacet.com/feedback, placeholder). Adds only the
+  (beta default `mailto:jv.zaniolo@gmail.com`). Adds only the
   Tacet version/build and macOS version (query items, or subject/body for a
   `mailto:`). The beta menu also shows "Beta 0.1.0 · ends <date>".
 - **DMG:** `scripts/make-beta-dmg.sh` → `build/Tacet-<version>-beta.dmg`

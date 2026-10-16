@@ -22,7 +22,7 @@ cp Support/Info.plist "$APP/Contents/Info.plist"
 PB=/usr/libexec/PlistBuddy
 BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M)}"
 $PB -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
-SITE_URL="${SITE_URL:-https://gettacet.com}"
+SITE_URL="${SITE_URL:-https://gettacet.pages.dev}"
 $PB -c "Add :TacetSiteURL string $SITE_URL" "$APP/Contents/Info.plist"
 if [ "${BETA:-0}" = "1" ]; then
     EXPIRES_DAYS="${EXPIRES_DAYS:-60}"
@@ -30,7 +30,7 @@ if [ "${BETA:-0}" = "1" ]; then
     $PB -c "Add :TacetBetaExpiry string $EXPIRY" "$APP/Contents/Info.plist"
     BETA_NUMBER="${BETA_NUMBER:-1}"
     $PB -c "Add :TacetBetaNumber string $BETA_NUMBER" "$APP/Contents/Info.plist"
-    FEEDBACK_URL="${FEEDBACK_URL:-https://gettacet.com/feedback}"
+    FEEDBACK_URL="${FEEDBACK_URL:-mailto:jv.zaniolo@gmail.com}"
     SIGN_IDENTITY="${SIGN_IDENTITY:-Tacet Beta}"
     echo "Beta $BETA_NUMBER, build $BUILD_NUMBER, expires $EXPIRY"
 fi

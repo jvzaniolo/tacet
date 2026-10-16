@@ -85,7 +85,7 @@ Releases so far:
 | Beta | Date | Expires | DMG SHA-256 |
 | --- | --- | --- | --- |
 | 1 (0.1.0) | 2026-10-16 | 2026-12-15 | `f8e99a6b…df132` (GitHub release, now retired) |
-| 2 (0.1.0) | 2026-10-16 | 2026-12-15 | `9e7ac46e4ce123fdf0d7067d3a5c9bc5218234a3650be7418520a07504e6aadc` |
+| 2 (0.1.0) | 2026-10-16 | 2026-12-15 | `dd7e3b4996e856006dd9f1b45a615aa9ec3400c2a88e4b0051bdd8f0d0bcb313` (build 202610162022; replaces build 202610162010, `9e7ac46e…6aadc`, whose "Visit Website" pointed at gettacet.com, a domain that isn't ours) |
 
 To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/install.sh`.
 
