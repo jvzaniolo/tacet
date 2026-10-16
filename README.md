@@ -35,6 +35,32 @@ build/MenuShelf.app/Contents/MacOS/MenuShelf
 Output also goes to `~/Library/Logs/MenuShelf.log` and the unified log
 (subsystem `dev.menushelf.MenuShelf`).
 
+## Self-test
+
+```bash
+.build/release/MenuShelf --selftest
+```
+
+This runs the hiding logic against a throwaway defaults domain
+(`dev.menushelf.selftest-target`). It touches no real app and needs no
+permissions.
+
+## How hiding works (experimental)
+
+macOS 27 removed the per-item windows the old tricks relied on. Thaw's
+bar-wide hiding uses a closed binary, so MenuShelf uses the one open
+mechanism: AppKit's per-item switch `NSStatusItem VisibleCC <autosaveName>`
+in the owning app's preferences, which System Settings also writes. Marking
+an app Hidden sets it to false for each of the app's items, and the
+original values are saved so revealing restores them exactly.
+
+- Only works for non-sandboxed apps. Apple's items are left alone.
+- An app may need a relaunch to pick up the change. Settings and the menu
+  offer **Relaunch**, and only do it when you click it.
+- Quitting MenuShelf restores every app it hid.
+
+Details and what is still unverified: [NOTES-macos27.md](NOTES-macos27.md).
+
 ## Permissions
 
 | Permission | Needed for | How |
@@ -70,7 +96,9 @@ Sources/MenuShelf/
   AX.swift                    Accessibility helpers
   MenuBarEnumerator.swift     Lists menu bar items per app via AXExtrasMenuBar
   AppModel.swift              Scan results, Hidden set, revealed state
-  Hiding.swift                Hiding backends
+  Hiding.swift                VisibleCC hiding backend, app relauncher
+  SelfTest.swift              --selftest for the hiding backend
+  Log.swift                   Console / unified log / ~/Library/Logs output
   StatusItemController.swift  The chevron status item and its menu
   SettingsView.swift          Settings window
   Onboarding.swift            Accessibility onboarding window
