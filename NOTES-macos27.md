@@ -1260,3 +1260,18 @@ Control Center switches) and the ⌘-drag animation in Settings. Auto-move
 stays a tested option for later: it needs the second grant
 (`com.apple.MenuBar`), and would make the animation and the grouping tip
 unnecessary for users who grant it.
+
+## 18. Settings focus and the app icon (2026-10-16)
+
+- **Settings opened in front but unfocused.** macOS 14+ activation is
+  cooperative: an agent app (no Dock icon) isn't handed focus by
+  `NSApp.activate()`, and `activate(ignoringOtherApps:)` is ignored. Ice,
+  Thaw and SaneBar (and Bartender, by its behaviour) switch to a regular app
+  while their settings window is open and back to an agent when it closes;
+  Tacet now does the same (Dock icon while Settings is open). Ice also
+  activates the Dock first on the very first activation; not needed so far.
+- **App icon:** "Glass" (user's pick of three, `Icon/previews/`). Drawn by
+  `Icon/make-icon.swift`, packed by `Icon/make-icns.sh` into
+  `Support/Tacet.icns`. Drawn as a pre-masked squircle, macOS 27 put it on a
+  gray plate ("icon jail"); drawn full bleed, macOS masks it itself and adds
+  its glass edge. One appearance only (no actool for dark/tinted).

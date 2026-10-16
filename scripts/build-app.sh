@@ -14,6 +14,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Tacet"
 cp Support/Info.plist "$APP/Contents/Info.plist"
+cp Support/Tacet.icns "$APP/Contents/Resources/Tacet.icns"   # from Icon/make-icns.sh
 # Translations: Resources/<lang>.lproj/Localizable.strings, looked up in the
 # main bundle (String Catalogs need xcstringstool, which only Xcode ships).
 cp -R Resources/*.lproj "$APP/Contents/Resources/"

@@ -10,6 +10,8 @@
         <string>pt-BR</string>
         <string>es</string>
     </array>
+    <key>CFBundleIconFile</key>
+    <string>Tacet</string>
     <key>CFBundleExecutable</key>
     <string>Tacet</string>
     <key>CFBundleIdentifier</key>

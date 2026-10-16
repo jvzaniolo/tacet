@@ -66,19 +66,23 @@ func linear(_ ctx: CGContext, _ path: CGPath, _ colors: [CGColor], from: CGPoint
 
 // MARK: Drawing
 
-/// Draws on a 1024 × 1024 canvas (y up).
-func draw(_ v: Variant, _ look: Look, in ctx: CGContext) {
-    let body = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let shape = squircle(body)
+/// Draws on a 1024 × 1024 canvas (y up). `fullBleed`: fill the whole square
+/// and let macOS apply its own mask (the app icon); otherwise draw the
+/// squircle with its shadow (previews).
+func draw(_ v: Variant, _ look: Look, fullBleed: Bool = false, in ctx: CGContext) {
+    let body = fullBleed ? CGRect(x: 0, y: 0, width: 1024, height: 1024) : CGRect(x: 100, y: 100, width: 824, height: 824)
+    let shape = fullBleed ? CGPath(rect: body, transform: nil) : squircle(body)
     let dark = look == .dark
 
     // Drop shadow, as on system icons.
+    if !fullBleed {
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: color(0x000000, 0.35))
     ctx.addPath(shape)
     ctx.setFillColor(color(0x000000))
     ctx.fillPath()
     ctx.restoreGState()
+    }
 
     // Background.
     let top = CGPoint(x: 512, y: 924), bottom = CGPoint(x: 512, y: 100)
@@ -119,12 +123,14 @@ func draw(_ v: Variant, _ look: Look, in ctx: CGContext) {
     ctx.drawRadialGradient(sheen, startCenter: CGPoint(x: 400, y: 960), startRadius: 0, endCenter: CGPoint(x: 400, y: 960), endRadius: 620, options: [])
     ctx.restoreGState()
 
+    if !fullBleed {
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.setLineWidth(4)
     ctx.setStrokeColor(color(0xFFFFFF, dark ? 0.12 : (v == .resting ? 0.9 : 0.22)))
     ctx.strokePath()
     ctx.restoreGState()
+    }
 
     // The double chevron.
     let center: CGPoint
@@ -173,7 +179,7 @@ func draw(_ v: Variant, _ look: Look, in ctx: CGContext) {
     }
 }
 
-func render(_ v: Variant, _ look: Look, pixels: Int) -> Data {
+func render(_ v: Variant, _ look: Look, pixels: Int, fullBleed: Bool = false) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                bytesPerRow: 0, bitsPerPixel: 0)!
@@ -181,7 +187,7 @@ func render(_ v: Variant, _ look: Look, pixels: Int) -> Data {
     ctx.interpolationQuality = .high
     ctx.setShouldAntialias(true)
     ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-    draw(v, look, in: ctx)
+    draw(v, look, fullBleed: fullBleed, in: ctx)
     return rep.representation(using: .png, properties: [:])!
 }
 
@@ -206,8 +212,10 @@ case "iconset":
     let dir = URL(fileURLWithPath: rest[1])
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for base in [16, 32, 128, 256, 512] {
-        try render(v, .light, pixels: base).write(to: dir.appendingPathComponent("icon_\(base)x\(base).png"))
-        try render(v, .light, pixels: base * 2).write(to: dir.appendingPathComponent("icon_\(base)x\(base)@2x.png"))
+        // Full bleed: macOS 26+ masks it to its own shape; a pre-drawn
+        // squircle that doesn't match exactly gets put on a gray plate.
+        try render(v, .light, pixels: base, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base).png"))
+        try render(v, .light, pixels: base * 2, fullBleed: true).write(to: dir.appendingPathComponent("icon_\(base)x\(base)@2x.png"))
     }
     print("Iconset in \(dir.path)")
 default:

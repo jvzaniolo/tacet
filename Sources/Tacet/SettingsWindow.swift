@@ -109,7 +109,12 @@ private struct WelcomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Welcome to Tacet").font(.title2.bold())
+            HStack(spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                Text("Welcome to Tacet").font(.title2.bold())
+            }
             Point(icon: "switch.2", title: "Tacet uses the macOS switches",
                   text: "It hides apps with the “Allow in the Menu Bar” switches in System Settings › Menu Bar. macOS does the hiding, so Notification Center, Focus and the camera and microphone indicators keep working.")
             Point(icon: "eye.slash", title: "Hidden apps show as off in System Settings",
