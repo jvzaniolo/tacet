@@ -6,15 +6,22 @@ import AppKit
 /// yields it, so a window opened from the status menu came up in front but
 /// inactive. While one of Tacet's windows is open Tacet is a regular app
 /// (Dock icon, like System Settings; Ice and Thaw do the same) and can
-/// activate itself. It goes back to an agent when its last window closes.
+/// activate itself (see `show`). It goes back to an agent when its last
+/// window closes.
 @MainActor
 enum AppFocus {
+    /// `NSApp.activate()` alone leaves the window in front but inactive
+    /// (tested: the frontmost app stays the previous one). Activating the
+    /// Dock first, as Ice does, makes macOS accept Tacet's activation right
+    /// after, even when it doesn't follow a click (tested from a notification).
     static func show(_ window: NSWindow) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
-        // The status menu may still be closing: try again on the next turn.
-        DispatchQueue.main.async {
+        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.activate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if let front = NSWorkspace.shared.frontmostApplication, front != .current {
+                NSRunningApplication.current.activate(from: front, options: [])
+            }
             NSApp.activate()
             window.makeKeyAndOrderFront(nil)
         }
