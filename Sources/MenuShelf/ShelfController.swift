@@ -42,9 +42,13 @@ final class ShelfController {
         for item in [chevron, divider] {
             guard let button = item.button else { continue }
             button.target = self
-            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+            // Act on mouse-up so AppKit finishes its own press tracking and
+            // clears the pressed state; acting on mouse-down left a capsule
+            // behind the chevron while revealed.
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             // No pressed capsule: the native overflow arrow has none.
             (button.cell as? NSButtonCell)?.highlightsBy = []
+            (button.cell as? NSButtonCell)?.showsStateBy = []
         }
         chevron.button?.action = #selector(chevronClicked)
         divider.button?.action = #selector(dividerClicked)
@@ -170,7 +174,7 @@ final class ShelfController {
 
     @objc private func chevronClicked() {
         clearHighlight(chevron)
-        if let event = NSApp.currentEvent, event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
+        if let event = NSApp.currentEvent, event.type == .rightMouseUp || event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
             showMenu()
             return
         }
