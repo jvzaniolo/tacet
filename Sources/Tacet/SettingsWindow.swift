@@ -8,7 +8,7 @@ import SwiftUI
 final class SettingsWindowController {
     private let model: ShelfModel
     private let ui = SettingsUIState()
-    private var window: NSWindow?
+    fileprivate var window: NSWindow?
     private var timer: Timer?
 
     init(model: ShelfModel) {
@@ -36,14 +36,33 @@ final class SettingsWindowController {
             }
             self.window = window
         }
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        bringToFront()
         // There's no change notification for these switches: while the
         // window is open, re-read them so changes made in System Settings
         // and newly tracked apps show up.
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.model.refresh() }
+        }
+    }
+}
+
+extension SettingsWindowController {
+    /// An agent app (no Dock icon) isn't brought forward by a plain
+    /// `NSApp.activate()` on macOS 14+: activation is cooperative, and when
+    /// the window opens from our status menu the menu is still closing. So
+    /// activate on the next turn of the run loop, ask the frontmost app to
+    /// hand activation over, and order the window front regardless.
+    fileprivate func bringToFront() {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async {
+            NSApp.activate()
+            if !NSApp.isActive, let front = NSWorkspace.shared.frontmostApplication, front != .current {
+                NSRunningApplication.current.activate(from: front, options: [])
+            }
+            window.orderFrontRegardless()
+            window.makeKey()
         }
     }
 }
