@@ -77,8 +77,11 @@ final class RevealPanel {
     /// `arrow` and `boundary` are AX (top-left) coordinates.
     /// `naturalX`: each item's x on the bar when last seen (by key), so the
     /// panel reproduces the real spacing and the hand-off doesn't shift icons.
+    /// `absoluteX`: exact x (AX) of each item on the real bar. When every
+    /// captured entry has one and they fit, icons are placed exactly there,
+    /// so swapping between panel and real bar shows no shift.
     func open(entries: [Entry], arrow: CGRect, boundary: CGFloat, barTop: CGFloat, barHeight: CGFloat,
-              naturalX: [String: CGFloat] = [:]) {
+              naturalX: [String: CGFloat] = [:], absoluteX: [String: CGFloat] = [:], animated: Bool = true) {
         container.subviews.forEach { $0.removeFromSuperview() }
         let views: [NSView] = entries.isEmpty ? [Self.emptyLabel()] : entries.map { entry in
             let button = ItemButton(entry: entry, height: barHeight)
@@ -94,6 +97,29 @@ final class RevealPanel {
             gaps.append(min(max(xb - xa - view.frame.width, 0), 24))
         }
         let contentWidth = views.reduce(0) { $0 + $1.frame.width } + gaps.reduce(0, +)
+
+        // Exact placement on the bar, when known for every item.
+        let exact: [CGFloat]? = {
+            let xs = views.compactMap { ($0 as? ItemButton).flatMap { absoluteX[BarReader.key(for: $0.entry.item)] } }
+            guard xs.count == views.count, let first = xs.first, let last = xs.last, let lastView = views.last,
+                  first >= boundary, last + lastView.frame.width <= arrow.minX else { return nil }
+            return xs
+        }()
+        if let exact, let first = exact.first, let lastView = views.last, let lastX = exact.last {
+            let width = lastX + lastView.frame.width - first
+            panel.setFrame(BarReader.cocoaRect(CGRect(x: first, y: barTop, width: width, height: barHeight)), display: false)
+            background.isHidden = true
+            background.frame = NSRect(x: 0, y: 0, width: width, height: barHeight)
+            backdrop.frame = background.frame
+            backdrop.isHidden = true
+            container.frame = background.frame
+            for (view, x) in zip(views, exact) {
+                view.frame.origin = NSPoint(x: x - first, y: (barHeight - view.frame.height) / 2)
+                container.addSubview(view)
+            }
+            present(animated: animated, offset: CGPoint(x: 14, y: 0))
+            return
+        }
 
         let available = arrow.minX - 6 - boundary
         let inline = contentWidth <= available
@@ -117,11 +143,29 @@ final class RevealPanel {
             x += view.frame.width + (i < gaps.count ? gaps[i] : 0)
         }
 
+        present(animated: animated, offset: inline ? CGPoint(x: 14, y: 0) : CGPoint(x: 0, y: 8))
+    }
+
+    private func present(animated: Bool, offset: CGPoint) {
         isOpen = true
         panel.alphaValue = 1
+        panel.contentView?.layer?.removeAllAnimations()
+        panel.contentView?.layer?.transform = CATransform3DIdentity
+        panel.contentView?.layer?.opacity = 1
         panel.orderFrontRegardless()
-        openOffset = inline ? CGPoint(x: 14, y: 0) : CGPoint(x: 0, y: 8)
-        animateIn(from: openOffset)
+        openOffset = offset
+        if animated { animateIn(from: offset) }
+    }
+
+    /// Spring settle time of the open animation.
+    static let openDuration: TimeInterval = 0.4
+
+    func bringToFront() { if panel.isVisible { panel.orderFrontRegardless() } }
+
+    /// Hides at once (the real bar shows the same icons underneath).
+    func vanish() {
+        isOpen = false
+        panel.orderOut(nil)
     }
 
     /// The open animation in reverse: slide back toward the arrow and fade,
@@ -167,6 +211,13 @@ final class RevealPanel {
     /// Slides each icon to the screen x of its real item (AX x), so the
     /// hand-off to the real bar lands without a jump.
     func moveItems(toAX xs: [String: CGFloat], duration: TimeInterval) {
+        if duration == 0 {
+            for case let button as ItemButton in container.subviews {
+                guard let x = xs[BarReader.key(for: button.entry.item)] else { continue }
+                button.setFrameOrigin(NSPoint(x: x - panel.frame.minX - container.frame.minX, y: button.frame.minY))
+            }
+            return
+        }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = duration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)

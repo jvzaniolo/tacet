@@ -16,6 +16,7 @@ final class HidingSpacer {
     let item: NSStatusItem
     private(set) var isEditing = false
     private var lastUnhideableRightEdge: CGFloat?
+    private var fitsStreak = 0
 
     static let autosaveName = "MenuShelfSpacer"
     static let editWidth: CGFloat = 22
@@ -39,9 +40,9 @@ final class HidingSpacer {
         render()
     }
 
-    /// Revealed: the hidden items are back on the real bar (after an item was
-    /// clicked in the panel). The spacer shrinks to a small item showing »;
-    /// its right edge stays put, so the » sits exactly where the arrow was.
+    /// Revealed: the hidden items are back on the real bar. The spacer
+    /// shrinks to a small blank item where the arrow was (its right edge stays
+    /// put), under ArrowCatcher's ».
     private(set) var isRevealed = false
     private var hiddenLength: CGFloat = 300
 
@@ -67,13 +68,21 @@ final class HidingSpacer {
     /// measured threshold (`rightEdge − boundary − 53 pt` with an arrow already
     /// on the bar, ~30 pt more without), at least 24 pt per step.
     @discardableResult
-    func fit(spacerFrame: CGRect, arrow: CGRect?, boundary: CGFloat) -> Bool {
+    func fit(spacerFrame: CGRect, arrow: CGRect?, boundary: CGFloat, others: [CGRect]) -> Bool {
         guard !isEditing, !isRevealed, boundary > 0 else { return false }
-        let overflowed = arrow.map { spacerFrame.minX < $0.minX } ?? false
+        // While macOS relayouts the bar its arrow can be missing from AX for a
+        // moment. Items parked inside our frame prove we are overflowed anyway
+        // (nothing can sit on top of a spacer that is drawn on the bar).
+        let parkedInside = others.contains { spacerFrame.insetBy(dx: 2, dy: -20).contains(CGPoint(x: $0.midX, y: spacerFrame.midY)) }
+        let overflowed = (arrow.map { spacerFrame.minX < $0.minX } ?? false) || parkedInside
         guard !overflowed else {
+            fitsStreak = 0
             if item.length > Self.maxWidth { item.length = Self.maxWidth; render(); return true }
             return false
         }
+        // Grow only after two readings agree, so one odd read can't do it.
+        fitsStreak += 1
+        guard fitsStreak >= 2 else { return false }
         let rightEdge = spacerFrame.maxX
         let target = (rightEdge - boundary - Self.arrowAllowance + Self.margin).rounded()
         // A display with more free space than a spacer can safely span (wide
@@ -89,6 +98,7 @@ final class HidingSpacer {
         }
         let next = min(max(target, item.length + 24), Self.maxWidth)
         guard next != item.length else { return false }
+        fitsStreak = 0
         Log.write("Spacer still fits: width \(Int(item.length)) → \(Int(next)) (right edge \(Int(rightEdge)), boundary \(Int(boundary)))")
         item.length = next
         render()
@@ -98,16 +108,8 @@ final class HidingSpacer {
     private func render() {
         let length = max(item.length, Self.editWidth)
         let editing = isEditing
-        if isRevealed, !editing {
-            let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-            let glyph = NSImage(systemSymbolName: "chevron.forward.2", accessibilityDescription: "Hide Menu Bar Items")?
-                .withSymbolConfiguration(config)
-            glyph?.isTemplate = true
-            item.button?.image = glyph
-            item.button?.imagePosition = .imageOnly
-            item.button?.toolTip = "Hide Menu Bar Items"
-            return
-        }
+        // Revealed: a blank slot. ArrowCatcher keeps drawing » (the mirrored
+        // native arrow) in place over it, so the arrow never changes look.
         item.button?.toolTip = "MenuShelf divider — ⌘-drag icons to its left to hide them"
         let image = NSImage(size: NSSize(width: length, height: 22), flipped: false) { rect in
             // Near-transparent fill so the item has real content.

@@ -40,12 +40,17 @@ final class ShelfController {
     private var trackTimer: Timer?
     private var restoreAfterPress = false
     private let barCapture = BarCapture()
+    private let cover = CoverWindow()
     /// Windows the hidden items' apps had on screen when we revealed them;
     /// anything newer is one of their menus or popovers.
     private var revealBaseline: Set<CGWindowID> = []
     private var revealedPIDs: Set<pid_t> = []
     private var lastPick: (key: String, at: Date)?
     private var lastCapturedArrow: CGRect?
+    private var lastKnownArrow: CGRect? {
+        get { (UserDefaults.standard.string(forKey: "lastArrow")).map { NSRectFromString($0) } }
+        set { UserDefaults.standard.set(newValue.map { NSStringFromRect($0) }, forKey: "lastArrow") }
+    }
 
     var openPermissions: (() -> Void)?
     var openDiagnostics: (() -> Void)?
@@ -119,16 +124,37 @@ final class ShelfController {
 
     private func apply(_ snap: BarReader.Snapshot, screen: BarReader.ScreenInfo?, boundary: CGFloat) {
         refreshing = false
+        var snap = snap
+        // macOS sometimes leaves its arrow out of AX for a while (seen for
+        // minutes after a relaunch) although items are visibly parked in the
+        // overflow. Then fall back to where the arrow last was.
+        if snap.arrow == nil, let spacerFrame = snap.spacer {
+            let parked = snap.visible.filter { f in f.frame.map { spacerFrame.insetBy(dx: 2, dy: -20).contains(CGPoint(x: $0.midX, y: spacerFrame.midY)) } ?? false }
+            if !parked.isEmpty, let parkedRight = parked.compactMap({ $0.frame?.maxX }).max() {
+                // Parked items stack just left of the arrow (measured: arrow
+                // minX ≈ rightmost parked edge − 10 pt, 17.5 × 36 pt).
+                let derived = CGRect(x: parkedRight - 10, y: barTop + 1, width: 17.5, height: 36)
+                let last = lastKnownArrow.flatMap { abs($0.minX - derived.minX) < 4 ? $0 : nil }
+                snap.arrow = last ?? derived
+                snap.hidden = parked
+                snap.visible.removeAll { item in parked.contains { $0.id == item.id } }
+            }
+        }
+        if let arrow = snap.arrow { lastKnownArrow = arrow }
         snapshot = snap
         barScreen = screen
         self.boundary = boundary
-        guard !spacer.isEditing, !spacer.isRevealed else { catcher.cover(arrow: nil); return }
+        guard !spacer.isEditing else { catcher.cover(arrow: nil); return }
+        // While revealed (or moving there or back) the catcher stays put over
+        // the old arrow spot, drawing ».
+        guard phase == .hidden || phase == .panel, !spacer.isRevealed else { return }
         guard !restoreAfterPress, !widthFrozen else { catcher.cover(arrow: snap.arrow); return }
-        if let frame = snap.spacer, spacer.fit(spacerFrame: frame, arrow: snap.arrow, boundary: boundary) {
+        if let frame = snap.spacer,
+           spacer.fit(spacerFrame: frame, arrow: snap.arrow, boundary: boundary, others: (snap.hidden + snap.visible).compactMap(\.frame)) {
             scheduleRefresh()
         }
         catcher.cover(arrow: snap.arrow)
-        if panel.isOpen, snap.arrow == nil { closePanel() }
+        if phase == .panel, snap.arrow == nil { closePanel() }
         // Keep the bar background and the native arrow glyph fresh for the
         // open state, while nothing of ours is drawn over the bar.
         if !panel.isOpen {
@@ -138,37 +164,89 @@ final class ShelfController {
         }
     }
 
-    // MARK: Panel
+    // MARK: Panel and reveal
+    //
+    // hidden ─click » ─▶ panel (our icons spring in from cache, instant)
+    //   └ after the spring: cover the bar, let the real items back in under
+    //     the cover, wait for macOS to finish moving them ─▶ swap: our panel
+    //     and cover vanish over the identical real icons ─▶ revealed (native
+    //     clicks and menus). Clicks on our icons before the swap are queued.
+    // revealed ─outside click / Esc / » ─▶ closing: our panel reappears over
+    //   the real icons, they go back into the overflow under the cover, and
+    //   our panel plays the open animation in reverse ─▶ hidden.
+    // Without Screen Recording there is no cover: the panel stays and items
+    // are pressed from it (pressMode ax behaviour).
 
-    private func togglePanel() {
-        if spacer.isRevealed { conceal(); return }
-        panel.isOpen ? closePanel() : openPanel()
+    private enum Phase { case hidden, panel, revealing, revealed, closing }
+    private var phase: Phase = .hidden
+    private var phaseToken = 0
+    private var pendingPick: MenuBarItem?
+    private var closeRequested = false
+    /// The arrow's AX frame when we revealed; the catcher stays there.
+    private var revealArrow: CGRect?
+
+    private var nativeReveal: Bool {
+        (UserDefaults.standard.string(forKey: "pressMode") ?? "native") == "native"
     }
 
-    private func openPanel() {
-        guard let arrow = snapshot.arrow else { return }
-        // Bar height from the arrow: it is vertically centred in the bar.
-        let top = barScreen?.axTop ?? 0
-        let barHeight = max(((arrow.midY - top) * 2).rounded(), 24)
-        let entries = sortedHidden().map { item -> RevealPanel.Entry in
+    private func togglePanel() {
+        switch phase {
+        case .hidden: openPanel()
+        case .panel: closePanel()
+        case .revealing: closeRequested = true
+        case .revealed: conceal()
+        case .closing: break
+        }
+    }
+
+    private func entries(for items: [MenuBarItem]) -> [RevealPanel.Entry] {
+        items.map { item in
             let key = BarReader.key(for: item)
             if let image = images.image(for: key) { return .init(item: item, image: image, isCaptured: true) }
             let icon = NSRunningApplication(processIdentifier: item.pid)?.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
             return .init(item: item, image: icon, isCaptured: false)
         }
-        panel.open(entries: entries, arrow: arrow, boundary: boundary, barTop: top, barHeight: barHeight,
-                   naturalX: images.order)
-        catcher.setOpen(true, cover: barCapture.expandedArrow)
-        installPanelMonitors()
     }
 
-    /// Closes the panel. A menu still open from one of its items is closed too
-    /// unless the click that closes us already does that (outside click).
+    private var barTop: CGFloat { barScreen?.axTop ?? 0 }
+    private func barHeight(for arrow: CGRect) -> CGFloat { max(((arrow.midY - barTop) * 2).rounded(), 24) }
+
+    /// The stretch of bar our cover hides: from the notch / app menus to just
+    /// left of the arrow (the catcher covers the arrow itself).
+    private func coverRectAX(arrow: CGRect) -> CGRect {
+        let left = boundary + 1
+        return CGRect(x: left, y: barTop, width: max(ArrowCatcher.coverRectAX(for: arrow).minX - left, 0), height: barHeight(for: arrow))
+    }
+
+    private func openPanel() {
+        guard phase == .hidden, let arrow = snapshot.arrow else { return }
+        phaseToken += 1
+        let token = phaseToken
+        pendingPick = nil
+        closeRequested = false
+        let hidden = sortedHidden()
+        panel.open(entries: entries(for: hidden), arrow: arrow, boundary: boundary, barTop: barTop,
+                   barHeight: barHeight(for: arrow), naturalX: images.order, absoluteX: expectedPositions(of: hidden, arrow: arrow))
+        catcher.setOpen(true, cover: barCapture.expandedArrow)
+        catcher.bringToFront()
+        phase = .panel
+        installPanelMonitors()
+        if nativeReveal {
+            DispatchQueue.main.asyncAfter(deadline: .now() + RevealPanel.openDuration) { [weak self] in
+                self?.beginReveal(token: token, arrow: arrow)
+            }
+        }
+    }
+
     private func closePanel(animated: Bool = true, dismissMenu: Bool = true) {
         if dismissMenu { tracker?.dismiss() }
         endTracking()
-        panel.close(animated: animated)
-        catcher.setOpen(false)
+        phaseToken += 1
+        if phase == .panel || phase == .hidden {
+            panel.close(animated: animated)
+            catcher.setOpen(false)
+            phase = .hidden
+        }
         removeMonitors()
     }
 
@@ -181,6 +259,101 @@ final class ShelfController {
         }.map(\.element)
     }
 
+    /// Where macOS will put `items` when revealed: right-aligned against the
+    /// arrow with the gap measured at the last reveal, using the real spacing
+    /// between items (from the last time they were on the bar). Exact as long
+    /// as the set of hidden items hasn't changed.
+    private func expectedPositions(of items: [MenuBarItem], arrow: CGRect) -> [String: CGFloat] {
+        let gapToArrow = UserDefaults.standard.object(forKey: "revealGap") as? Double ?? 30
+        let keys = items.map(BarReader.key(for:))
+        let widths = zip(items, keys).map { item, key in images.image(for: key)?.size.width ?? item.frame?.width ?? 24 }
+        var spacing: [CGFloat] = []
+        for i in 0..<max(items.count - 1, 0) {
+            if let a = images.order[keys[i]], let b = images.order[keys[i + 1]] {
+                spacing.append(min(max(b - a - widths[i], 0), 24))
+            } else {
+                spacing.append(4)
+            }
+        }
+        let total = widths.reduce(0, +) + spacing.reduce(0, +)
+        var x = arrow.minX - CGFloat(gapToArrow) - total
+        var result: [String: CGFloat] = [:]
+        for (i, key) in keys.enumerated() {
+            result[key] = x.rounded()
+            x += widths[i] + (i < spacing.count ? spacing[i] : 0)
+        }
+        return result
+    }
+
+    /// Lets the real items back onto the bar under a cover, then swaps.
+    private func beginReveal(token: Int, arrow: CGRect) {
+        guard phase == .panel, token == phaseToken else { return }
+        let rect = coverRectAX(arrow: arrow)
+        guard cover.show(barCapture.backgroundPatch(for: rect), over: rect) else {
+            Log.write("Reveal: no bar capture (Screen Recording off?); staying in panel mode")
+            return
+        }
+        panel.bringToFront()
+        catcher.bringToFront()
+        phase = .revealing
+        revealArrow = arrow
+        let hidden = snapshot.hidden
+        revealedPIDs = Set(hidden.map(\.pid))
+        revealBaseline = Set(revealedPIDs.flatMap { MenuTracker.windows(of: $0).map(\.id) })
+        let parked = Dictionary(hidden.compactMap { item in MenuBarEnumerator.frame(of: item.element).map { (BarReader.key(for: item), $0.minX) } },
+                                uniquingKeysWith: { a, _ in a })
+        let started = Date()
+        spacer.setRevealed(true)
+        waitForLayout(of: hidden, parked: parked, since: started) { [weak self] frames in
+            guard let self, token == self.phaseToken else { return }
+            // AX reports the final layout at once; macOS animates to it for
+            // ~0.3 s more. Swap only once that animation is over.
+            let wait = max(0, 0.45 - Date().timeIntervalSince(started))
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+                guard token == self.phaseToken else { return }
+                self.completeReveal(frames: frames, items: hidden, since: started)
+            }
+        }
+    }
+
+    private func completeReveal(frames: [String: CGFloat], items: [MenuBarItem], since: Date) {
+        // Learn where macOS put them, so the next open lands exactly there.
+        if let arrow = revealArrow {
+            let rightEdges = items.compactMap { MenuBarEnumerator.frame(of: $0.element)?.maxX }
+            if let last = rightEdges.max() {
+                let gap = arrow.minX - last
+                if gap > 0, gap < 80 { UserDefaults.standard.set(Double(gap), forKey: "revealGap") }
+                let predicted = panel.itemFrames.map { $0.frame.minX }.min() ?? 0
+                Log.write("Reveal: gap to arrow \(Int(gap)) pt; panel→real shift \(Int((frames.values.min() ?? predicted) - predicted)) pt")
+            }
+        }
+        let planned = Dictionary(panel.itemFrames.map { (BarReader.key(for: $0.item), $0.frame.minX) }, uniquingKeysWith: { a, _ in a })
+        Log.write("Reveal: planned vs real " + frames.sorted { $0.value < $1.value }.map { "\($0.key.split(separator: "|").last ?? ""): \(Int(planned[$0.key] ?? -1))→\(Int($0.value))" }.joined(separator: ", "))
+        panel.moveItems(toAX: frames, duration: 0)
+        panel.vanish()
+        cover.hide()
+        catcher.bringToFront()
+        phase = .revealed
+        Log.write("Revealed natively in \(Int(Date().timeIntervalSince(since) * 1000)) ms")
+        installRevealedMonitors()
+        if let pick = pendingPick {
+            pendingPick = nil
+            Self.pressAsync(pick)
+        }
+        if closeRequested { closeRequested = false; conceal(); return }
+        // The real icons are on screen: refresh images and positions so the
+        // panel matches them exactly next time.
+        let length = spacer.length
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, self.phase == .revealed else { return }
+            Task { @MainActor in
+                let snap = await Task.detached { BarReader.snapshot(spacerLength: length) }.value
+                let screen = BarReader.screen(for: snap.spacer, in: BarReader.screens())
+                await self.images.capture(snap.visible, on: screen)
+            }
+        }
+    }
+
     /// Close rules while our panel is up, copied from the native overflow
     /// (NOTES §8): a click outside the panel *and* outside the menu of the item
     /// we opened, a click on the arrow, or Esc while no menu is open. No timer.
@@ -189,11 +362,10 @@ final class ShelfController {
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                guard let self, self.panel.isOpen else { return }
-                if self.catcher.frame.contains(location) { return }
-                if self.panel.frame.contains(location) {
-                    // A tracking NSMenu (pressMode ax) swallows the click that
-                    // dismisses it, so our item never sees it: replay it.
+                guard let self, self.phase == .panel || self.phase == .revealing else { return }
+                if self.catcher.frame.contains(location) || self.panel.frame.contains(location) {
+                    // A tracking NSMenu (no-cover fallback) swallows the click
+                    // that dismisses it, so our item never sees it: replay it.
                     if let tracker = self.tracker, tracker.isTrackingMenu,
                        let hit = self.panel.itemFrames.first(where: { $0.frame.contains(location) }),
                        BarReader.key(for: hit.item) != BarReader.key(for: tracker.item) {
@@ -202,6 +374,7 @@ final class ShelfController {
                     return
                 }
                 if let tracker = self.tracker, tracker.contains(cocoaPoint: location) { return }
+                if self.phase == .revealing { self.closeRequested = true; return }
                 // The click also dismisses the item's menu by itself.
                 self.closePanel(dismissMenu: false)
             }
@@ -209,7 +382,9 @@ final class ShelfController {
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
             MainActor.assumeIsolated {
-                guard let self, self.panel.isOpen, Date() > MenuTracker.injectingEscapeUntil else { return }
+                guard let self, Date() > MenuTracker.injectingEscapeUntil else { return }
+                if self.phase == .revealing { self.closeRequested = true; return }
+                guard self.phase == .panel else { return }
                 // Esc with a menu open belongs to that menu; the panel stays.
                 if let tracker = self.tracker, tracker.isOpen { return }
                 self.closePanel()
@@ -232,40 +407,17 @@ final class ShelfController {
         // A replayed click and the real one can both arrive: keep one.
         if let lastPick, lastPick.key == key, Date().timeIntervalSince(lastPick.at) < 0.3 { return }
         lastPick = (key, Date())
-        switch UserDefaults.standard.string(forKey: "pressMode") ?? "handoff" {
-        case "ax": pickInPanel(item)
-        case "reveal": closePanel(animated: false); pressRevealed(item)
-        default: handOff(pressing: item)
+        if nativeReveal, phase == .panel || phase == .revealing, cover.isShown || barCapture.background != nil {
+            // The real item is about to be on the bar: press it there.
+            pendingPick = item
+            panel.setPressed(item)
+            return
         }
-    }
-
-    /// Hands the hidden items back to the real bar and presses `item` there,
-    /// so its menu opens under it. The panel covers the bar while items move.
-    private func handOff(pressing item: MenuBarItem) {
-        guard panel.isOpen, !spacer.isRevealed else { return }
-        let hidden = snapshot.hidden
-        let panelAX = CGRect(x: panel.frame.minX, y: BarReader.primaryHeight - panel.frame.maxY,
-                             width: panel.frame.width, height: panel.frame.height)
-        panel.setBackdrop(barCapture.backgroundPatch(for: panelAX))
-        panel.setPressed(item)
-        removeMonitors()
-        revealedPIDs = Set(hidden.map(\.pid))
-        revealBaseline = Set(revealedPIDs.flatMap { MenuTracker.windows(of: $0).map(\.id) })
-        spacer.setRevealed(true)
-        catcher.setOpen(false)
-        catcher.cover(arrow: nil)
-        let started = Date()
-        let parked = Dictionary(hidden.compactMap { item in MenuBarEnumerator.frame(of: item.element).map { (BarReader.key(for: item), $0.minX) } },
-                                uniquingKeysWith: { a, _ in a })
-        waitForLayout(of: hidden, parked: parked, since: started) { [weak self] frames in
-            guard let self else { return }
-            Log.write("Hand-off: items settled in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
-            self.panel.moveItems(toAX: frames, duration: 0.08)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                self.panel.handOff(duration: 0.1)
-                self.installRevealedMonitors()
-                Self.pressAsync(item)
-            }
+        if UserDefaults.standard.string(forKey: "pressMode") == "reveal" {
+            closePanel(animated: false)
+            pressRevealed(item)
+        } else {
+            pickInPanel(item)
         }
     }
 
@@ -311,7 +463,8 @@ final class ShelfController {
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                guard let self, self.spacer.isRevealed else { return }
+                guard let self, self.phase == .revealed else { return }
+                if self.catcher.frame.contains(location) { return }
                 if self.isInRevealedBar(location) || self.isInItemMenu(location) { return }
                 self.conceal()
             }
@@ -319,7 +472,7 @@ final class ShelfController {
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
             MainActor.assumeIsolated {
-                guard let self, self.spacer.isRevealed, !self.isAnyItemMenuOpen() else { return }
+                guard let self, self.phase == .revealed, !self.isAnyItemMenuOpen() else { return }
                 self.conceal()
             }
         }
@@ -343,14 +496,43 @@ final class ShelfController {
 
     private func isAnyItemMenuOpen() -> Bool { !itemMenuWindows().isEmpty }
 
-    /// Ends the revealed state: items go back into the overflow.
+    /// revealed → hidden: our panel reappears over the real icons at their
+    /// exact positions, the real items go back into the overflow under the
+    /// cover, and the panel plays the open animation in reverse.
     private func conceal() {
+        guard phase == .revealed else { return }
+        phase = .closing
+        phaseToken += 1
+        let token = phaseToken
         removeMonitors()
-        panel.close(animated: false)
-        spacer.setRevealed(false)
-        revealedPIDs = []
-        revealBaseline = []
-        scheduleRefresh()
+        let length = spacer.length
+        Task { @MainActor in
+            let snap = await Task.detached { BarReader.snapshot(spacerLength: length) }.value
+            guard token == self.phaseToken else { return }
+            let revealed = snap.visible.filter { self.revealedPIDs.contains($0.pid) }
+                .sorted { ($0.frame?.minX ?? 0) < ($1.frame?.minX ?? 0) }
+            var xs: [String: CGFloat] = [:]
+            for item in revealed { if let f = item.frame { xs[BarReader.key(for: item)] = f.minX } }
+            let arrow = self.revealArrow ?? snap.spacer ?? .zero
+            let rect = self.coverRectAX(arrow: arrow)
+            let covered = self.cover.show(self.barCapture.backgroundPatch(for: rect), over: rect)
+            if covered {
+                self.panel.open(entries: self.entries(for: revealed), arrow: arrow, boundary: self.boundary, barTop: self.barTop,
+                                barHeight: self.barHeight(for: arrow), absoluteX: xs, animated: false)
+                self.catcher.bringToFront()
+            }
+            self.spacer.setRevealed(false)
+            self.panel.close(animated: covered)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard token == self.phaseToken else { return }
+                self.cover.hide(fade: 0.08)
+                self.catcher.setOpen(false)
+                self.revealedPIDs = []
+                self.revealBaseline = []
+                self.phase = .hidden
+                self.scheduleRefresh()
+            }
+        }
     }
 
     /// `pressMode ax`: press from the panel without revealing; the panel stays
@@ -519,7 +701,7 @@ final class ShelfController {
             refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.logSnapshot() }
         case "open": openPanel(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.logSnapshot() }
-        case "close": closePanel()
+        case "close": phase == .revealed ? conceal() : closePanel()
         case "press":
             let hidden = sortedHidden()
             if let n = parts.dropFirst().first.flatMap(Int.init), hidden.indices.contains(n) { pick(hidden[n]) }
@@ -529,6 +711,18 @@ final class ShelfController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in self?.logSnapshot() }
         case "auto": widthFrozen = false; refresh()
         case "barwindows": Task { await ItemImageCache.debugCaptureBarWindows() }
+        case "shot": Task { await BarCapture.debugShot(name: parts.dropFirst().first ?? "shot") }
+        case "film":
+            // film <name> <count> <ms>: a burst of bar screenshots.
+            let name = parts.count > 1 ? parts[1] : "film"
+            let count = parts.count > 2 ? Int(parts[2]) ?? 10 : 10
+            let ms = parts.count > 3 ? Int(parts[3]) ?? 80 : 80
+            Task {
+                for i in 0..<count {
+                    await BarCapture.debugShot(name: String(format: "%@-%02d", name, i))
+                    try? await Task.sleep(for: .milliseconds(ms))
+                }
+            }
         case "edit": beginEditing()
         case "done": finishEditing()
         default: break

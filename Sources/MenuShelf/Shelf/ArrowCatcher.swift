@@ -40,6 +40,9 @@ final class ArrowCatcher {
     }
 
     var frame: NSRect { window.frame }
+
+    /// Keeps the catcher above our other bar windows.
+    func bringToFront() { if window.isVisible { window.orderFrontRegardless() } }
     var isShown: Bool { window.isVisible }
 
     /// Open state: `cover` is a capture of the bar under the arrow, mirrored,
