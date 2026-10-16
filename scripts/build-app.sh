@@ -28,9 +28,11 @@ if [ "${BETA:-0}" = "1" ]; then
     EXPIRES_DAYS="${EXPIRES_DAYS:-60}"
     EXPIRY="$(date -u -v+"${EXPIRES_DAYS}"d +%Y-%m-%dT%H:%M:%SZ)"
     $PB -c "Add :TacetBetaExpiry string $EXPIRY" "$APP/Contents/Info.plist"
+    BETA_NUMBER="${BETA_NUMBER:-1}"
+    $PB -c "Add :TacetBetaNumber string $BETA_NUMBER" "$APP/Contents/Info.plist"
     FEEDBACK_URL="${FEEDBACK_URL:-https://gettacet.com/feedback}"
     SIGN_IDENTITY="${SIGN_IDENTITY:-Tacet Beta}"
-    echo "Beta build $BUILD_NUMBER, expires $EXPIRY"
+    echo "Beta $BETA_NUMBER, build $BUILD_NUMBER, expires $EXPIRY"
 fi
 if [ -n "${FEEDBACK_URL:-}" ]; then
     $PB -c "Add :TacetFeedbackURL string $FEEDBACK_URL" "$APP/Contents/Info.plist"

@@ -63,26 +63,29 @@ All betas must use this identity: macOS ties the file grant to it.
 
 **Each beta:**
 
-1. Bump `CFBundleShortVersionString` in `Support/Info.plist`.
-2. Build the DMG (options: `EXPIRES_DAYS`, `FEEDBACK_URL`, `SITE_URL`):
+1. Keep `CFBundleShortVersionString` in `Support/Info.plist` (e.g. 0.1.0)
+   and raise `BETA_NUMBER` (the menu then shows "Beta 2 (0.1.0) · ends …").
+2. Build the DMG (options: `EXPIRES_DAYS`, default 60; `FEEDBACK_URL`;
+   `SITE_URL`):
 
    ```bash
-   FEEDBACK_URL="https://gettacet.com/feedback" scripts/make-beta-dmg.sh
+   BETA_NUMBER=2 FEEDBACK_URL="mailto:jv.zaniolo@gmail.com" scripts/make-beta-dmg.sh
    ```
 
-3. Publish it on GitHub Releases in the public, binaries-only repo
-   [jvzaniolo/tacet-beta](https://github.com/jvzaniolo/tacet-beta) (its
-   README is the tester guide; feedback goes to its issues):
+   It writes `build/Tacet-<version>-beta.<n>.dmg`. With a `mailto:`
+   feedback link, "Send Feedback…" opens a message whose subject carries the
+   Tacet and macOS versions, nothing else.
+3. Upload the DMG to the Gumroad product (a $0 product; each tester gets
+   their own download link and can reply to the Gumroad email). The
+   `jvzaniolo/tacet-beta` GitHub repo hosted beta 1 and is being made
+   private; don't publish betas there.
 
-   ```bash
-   gh release create v0.1.0-beta.1 build/Tacet-0.1.0-beta.dmg \
-     --repo jvzaniolo/tacet-beta --prerelease \
-     --title "Tacet 0.1.0 beta 1" --notes "What changed…"
-   ```
+Releases so far:
 
-   Testers get `https://github.com/jvzaniolo/tacet-beta/releases`
-   (`/releases/latest` skips prereleases). First release: v0.1.0-beta.1,
-   2026-10-16, expires 2026-12-15.
+| Beta | Date | Expires | DMG SHA-256 |
+| --- | --- | --- | --- |
+| 1 (0.1.0) | 2026-10-16 | 2026-12-15 | `f8e99a6b…df132` (GitHub release, now retired) |
+| 2 (0.1.0) | 2026-10-16 | 2026-12-15 | `9e7ac46e4ce123fdf0d7067d3a5c9bc5218234a3650be7418520a07504e6aadc` |
 
 To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/install.sh`.
 

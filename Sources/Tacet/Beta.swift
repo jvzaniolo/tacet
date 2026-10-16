@@ -22,6 +22,12 @@ enum BuildInfo {
         (info["TacetBetaExpiry"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
     }
     static var isBeta: Bool { betaExpiry != nil }
+    /// `TacetBetaNumber` (BETA_NUMBER at build time): "beta 2".
+    static var betaNumber: String? { info["TacetBetaNumber"] as? String }
+    /// "0.1.0 beta 2 (202610162010)", or "0.1.0 (…)" outside betas.
+    static var versionLabel: String {
+        "\(shortVersion)\(isBeta ? " beta\(betaNumber.map { " \($0)" } ?? "")" : "") (\(build))"
+    }
     static var isExpired: Bool { betaExpiry.map { Date() >= $0 } ?? false }
 
     static var siteURL: URL? { (info["TacetSiteURL"] as? String).flatMap(URL.init(string:)) }
@@ -31,13 +37,11 @@ enum BuildInfo {
     static var feedbackURL: URL? {
         guard let raw = info["TacetFeedbackURL"] as? String, !raw.isEmpty,
               var parts = URLComponents(string: raw) else { return nil }
-        let versions = "Tacet \(shortVersion) (\(build))\(isBeta ? " beta" : ""), macOS \(macOSVersion)"
         var items = parts.queryItems ?? []
         if parts.scheme == "mailto" {
-            items.append(URLQueryItem(name: "subject", value: "Tacet feedback"))
-            items.append(URLQueryItem(name: "body", value: "\n\n—\n\(versions)"))
+            items.append(URLQueryItem(name: "subject", value: "Tacet \(versionLabel) feedback · macOS \(macOSVersion)"))
         } else {
-            items.append(URLQueryItem(name: "version", value: "\(shortVersion) (\(build))\(isBeta ? " beta" : "")"))
+            items.append(URLQueryItem(name: "version", value: versionLabel))
             items.append(URLQueryItem(name: "macos", value: macOSVersion))
         }
         parts.queryItems = items
