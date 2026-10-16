@@ -14,7 +14,10 @@ import ApplicationServices
 /// Everything is logged to ~/Library/Logs/MenuShelf.log with a "SPIKE" prefix.
 @MainActor
 final class SpikeController {
-    private var spacer: NSStatusItem?
+    var spacer: NSStatusItem?
+    var autoTimer: Timer?
+    var lastApply = Date.distantPast
+    var pendingTarget: CGFloat?
     private var watchTimer: Timer?
     private var lastArrowState: String?
     private var lastArrowChange = Date()
@@ -29,7 +32,7 @@ final class SpikeController {
         }
     }
 
-    private func log(_ s: String) { Log.write("SPIKE \(s)") }
+    func log(_ s: String) { Log.write("SPIKE \(s)") }
 
     private func handle(_ command: String) {
         let parts = command.split(separator: " ").map(String.init)
@@ -47,6 +50,13 @@ final class SpikeController {
             probe(after: 0)
         case "press":
             pressArrow()
+        case "sweep":
+            let nums = parts.dropFirst().compactMap { Double($0) }.map { CGFloat($0) }
+            if nums.count == 3 { sweep(from: nums[0], to: nums[1], step: nums[2]) }
+        case "geo":
+            log(describeGeometry())
+        case "auto":
+            setAuto(parts.count > 1 && parts[1] == "on")
         case "watch":
             setWatching(parts.count > 1 && parts[1] == "on")
         default:

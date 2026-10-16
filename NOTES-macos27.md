@@ -368,3 +368,119 @@ reveal experience: a gap, or jumps.
      unverified.
 3. Before deciding, test on a **non-notch external display** and on an
    **uncrowded bar**. The dead-zone widths and the reflow behaviour may differ.
+
+---
+
+## 9. Spike: native overflow with a minimal gap (2026-10-16)
+
+**Question:** if the spacer is sized live to *just* overflow, is the gap in
+the expanded overflow small enough to feel native?
+
+**Tooling (spike only):** `Sources/MenuShelf/SpikeAuto.swift`.
+- `build/spike sweep <from> <to> <step>`: resizes the spacer and logs AX
+  geometry plus the spacer's own window frame at each step.
+- `build/spike geo`: logs the gap while the overflow is expanded.
+- `build/spike auto on`: an AX-based live sizer. It is a prototype: its
+  "first visible item" lookup is only right while the spacer is overflowed,
+  and it was **not exercised**. See "Not tested".
+
+### Verdict: **not viable → go to option 3 (our own bar)**
+
+The minimal gap is not small. It equals the empty stretch between the notch
+(or the app menus) and the first visible icon, minus about 55 pt, and it
+grows with every icon you hide. Worse, the spacer takes room in the
+**capped expansion area** left of the notch, so with many hidden icons the
+open overflow **doesn't draw some of the hidden icons at all**. "Native
+animation + configurable" can't be had this way.
+
+### Measurements (built-in 1800 pt notch display, notch 790–1010)
+
+**Threshold.** The spacer grows **leftward from a fixed right edge**, and
+overflows exactly when
+
+```
+W ≥ spacerRight − notchRight − 53 pt   (arrow already present)
+```
+
+| Layout | Spacer right edge | Predicted W* | Measured |
+| --- | --- | --- | --- |
+| Divider between Claude and Raycast "OCB" | 1342 | 279 | fits at 278, overflows at 280 |
+| Divider just left of Wi-Fi (most icons hidden) | 1470 | 407 | fits at 400, overflows at 410 |
+
+- The 53 pt is the space the arrow needs when it is already on the bar (on
+  this crowded bar, other items overflow anyway).
+- On a bar where nothing else overflows, the constant should be smaller,
+  since the spacer would fit without the arrow. **Not measured.** A live
+  sizer has to stay over the higher, no-arrow threshold to be safe, which
+  adds roughly 30 pt more gap.
+
+**Gap with the overflow open, spacer at the minimum width (not shrunk on expand):**
+
+| Scenario | Spacer | What the user sees |
+| --- | --- | --- |
+| Native, no spacer (bar crowded on its own) | — | **65 pt** from the last revealed icon to the notch |
+| Crowded bar, divider before "OCB" | 282 pt | **317 pt** gap to the notch. User: "gap still big"; animation itself native. Photo: revealed icons stop at Claude's ✳︎, then empty bar through the notch to the » arrow. |
+| Most icons hidden, divider before Wi-Fi | 410 pt | Spacer fills x 351–763. **Only Claude and "OCB" are drawn**; OrbStack, ChatGPT, MenuShelf, 1Password, Raycast and Stats are absent from MenuBarAgent's drawn list, so they **can't be reached at all** |
+| Few menu bar apps (true uncrowded) | — | **Not tested** (would require quitting your apps). Expected the same as the row above: the free space is larger, so the spacer is wider. |
+| External / non-notch display | — | **Not tested.** No external display connected (`NSScreen.screens` has only the built-in one). |
+
+**Why it can't get small:**
+- The spacer has to be wider than the empty stretch it sits in. That stretch
+  includes the room freed by every icon it hides.
+- When the overflow opens, MenuBarAgent lays out the overflow group,
+  *including the spacer at full width*, in the area left of the notch:
+  roughly from the end of the app menus to x 790.
+- That area is fixed. The spacer competes with the hidden icons for it, and
+  icons that don't fit aren't drawn.
+- That's also the §8 dead zone: at about 800 pt the spacer alone can't fit
+  in it, so there's no arrow and nothing can be revealed.
+
+### Live sizing: inputs found, not needed
+
+The inputs for the sizer can be read without Accessibility, but given the
+verdict a live sizer wasn't pursued further:
+
+| Need | Permission-free source (verified) |
+| --- | --- |
+| Spacer's right edge | Spacer's own `button.window.frame.maxX` (−7 pt). It stays constant as the spacer grows, overflowed or not. |
+| Did it overflow? | Own window `maxX` moves left by 8 pt at the threshold (1349 → 1341, and 1477 → 1469 in the second layout's sweep data) |
+| Is the overflow open? | Own window jumps into the left area (x 1043 → 472) |
+| Notch boundary | `NSScreen.auxiliaryTopRightArea.minX` / `auxiliaryTopLeftArea.maxX` |
+| Non-notch boundary (end of app menus) | No public permission-free source found. AX `kAXMenuBarAttribute` of the frontmost app works. |
+| Triggers | Spacer window move/resize notifications, `NSWorkspace` launch/quit, `NSApplication.didChangeScreenParametersNotification`. Debounce ~0.5 s and use ≥3 pt hysteresis, because every resize relayouts the bar. |
+
+### Edge cases
+
+- **Width change while the overflow is open** (tested in §8 by shrinking):
+  the bar relayouts, and freed icons fly back onto the main bar. Any live
+  resize while open will jump, so a sizer must freeze while open.
+- **Icon added or removed while open:** not tested (would need you to
+  quit/launch an app). The same relayout is expected.
+- **⌘-drag:** works for moving the divider. A resized spacer keeps its
+  dragged position, even across `removeStatusItem` + re-create (same
+  `autosaveName`).
+
+### Permissions (for comparison with option 3)
+
+- **This approach:** a sandboxed, permission-free build is plausible on notch
+  displays (own window frame + `NSScreen`). Non-notch displays need
+  Accessibility to find the end of the app menus.
+- **Option 3 (our own bar / panel):** hiding still needs a hiding mechanism.
+  - The spacer can still do the hiding, with no permissions.
+  - Showing hidden items in our own panel means drawing their images (Screen
+    Recording) and forwarding clicks (Accessibility: AXPress on the real item).
+  - So option 3 likely needs Accessibility, plus optional Screen Recording
+    for icons. That makes the Mac App Store unlikely; ship direct ($5 via
+    Paddle/Gumroad, notarized).
+
+### Recommendation
+
+**Go to option 3:**
+- Keep the spacer only as the *hiding* mechanism. It is permission-free and
+  configured with ⌘-drag, as tested.
+- Reveal in **our own** panel or bar under the menu bar, using our own spring
+  (bounce) + fade animation and `chevron.backward.2` / `chevron.forward.2`,
+  with Apple's close rules (click outside or on the chevron, no timer).
+- Apple's arrow will still exist whenever the spacer causes overflow. Test
+  whether it's acceptable to leave it, or whether to size the spacer so that
+  it is the only thing overflowing.
