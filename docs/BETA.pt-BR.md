@@ -15,7 +15,9 @@ Menus" do macOS.
 
 ## Instalação
 
-1. Baixe o `Tacet-<versão>-beta.<n>.dmg` pelo seu link do Gumroad e abra.
+1. Baixe o `Tacet-<versão>-beta.<n>.zip` pelo seu link do Gumroad. O Safari
+   descompacta numa pasta com o Tacet e um guia "How to Install" (senão, dê
+   dois cliques no zip).
 2. Arraste o **Tacet** para **Aplicativos**.
 3. Abra o Tacet em Aplicativos. Na primeira vez, o macOS bloqueia porque o
    beta não é notarizado pela Apple. Para permitir:
@@ -40,7 +42,7 @@ são incluídas as versões do Tacet e do macOS.
 
 ## Atualizar para um novo beta
 
-Encerre o Tacet (botão direito › Encerrar Tacet), baixe o novo DMG e
+Encerre o Tacet (botão direito › Encerrar Tacet), baixe o novo zip e
 arraste o Tacet para Aplicativos, substituindo o antigo. Todos os betas são
 assinados com o mesmo certificado, então o acesso concedido e os ajustes
 continuam. Um novo download precisa de **Abrir Mesmo Assim** (ou do comando

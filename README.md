@@ -145,7 +145,7 @@ open -n /Applications/Tacet.app --args -AppleLanguages "(fr)"
 
 Free beta distribution (self-signed, no Apple account): see
 [docs/BETA.md](docs/BETA.md). In short: `scripts/make-beta-cert.sh` once, then
-`scripts/make-beta-dmg.sh` per beta (options `EXPIRES_DAYS`, `FEEDBACK_URL`,
+`scripts/make-beta-zip.sh` per beta (options `EXPIRES_DAYS`, `FEEDBACK_URL`,
 `SITE_URL`). Beta builds expire and then stop hiding.
 
 ## App icon
@@ -183,7 +183,8 @@ scripts/build-app.sh          Builds and signs build/Tacet.app (INSTALL=1 also i
 scripts/install.sh            Builds and installs to /Applications
 scripts/check-localizations.py  Checks the translations against the source
 scripts/make-beta-cert.sh     Creates the self-signed "Tacet Beta" signing certificate
-scripts/make-beta-dmg.sh      Builds a beta and packs Tacet-<version>-beta.dmg
+scripts/make-beta-zip.sh      Builds a beta and packs Tacet-<version>-beta.<n>.zip with the install guide
+scripts/make-beta-dmg.sh      Same as a DMG (for the notarized release; unnotarized, macOS warns twice)
 docs/BETA.md, BETA.pt-BR.md   Tester guide and release steps
 Resources/<lang>.lproj/       Localizable.strings per language (en, pt-BR, es)
 Sources/Tacet/

@@ -1,0 +1,87 @@
+TACET BETA — HOW TO INSTALL
+(Português e Español abaixo / abajo)
+
+Tacet needs macOS 27 or later.
+
+1. Drag Tacet into your Applications folder.
+
+2. Open Tacet from Applications. macOS will say it can't verify Tacet,
+   because this beta isn't notarized by Apple yet. Click Done, then:
+   open System Settings › Privacy & Security, scroll down to the message
+   about Tacet, click Open Anyway and confirm.
+   You only need to do this once.
+
+3. Tacet asks for access to one file, where macOS keeps the menu bar
+   settings. Click Grant Access…, select the file Tacet points to, and
+   click Grant Access.
+
+4. Turn on the apps you want to hide under Hide in Tacet. Then hold ⌘
+   and drag Tacet's arrow to the right of them.
+
+Click the arrow to show your hidden apps; click again to tuck them away.
+Quitting Tacet brings every icon back. The beta works until
+{{EXPIRES_EN}}.
+
+Questions or feedback: right-click Tacet's arrow › Send Feedback…
+https://gettacet.pages.dev
+
+
+────────────────────────────────────────
+
+TACET BETA — COMO INSTALAR
+
+O Tacet precisa do macOS 27 ou mais recente.
+
+1. Arraste o Tacet para a pasta Aplicativos.
+
+2. Abra o Tacet pela pasta Aplicativos. O macOS vai dizer que não
+   conseguiu verificar o Tacet, porque este beta ainda não é notarizado
+   pela Apple. Clique em OK e depois: abra Ajustes do Sistema ›
+   Privacidade e Segurança, role até a mensagem sobre o Tacet, clique em
+   Abrir Mesmo Assim e confirme.
+   Isso só precisa ser feito uma vez.
+
+3. O Tacet pede acesso a um arquivo, onde o macOS guarda os ajustes da
+   Barra de Menus. Clique em Conceder Acesso…, selecione o arquivo que o
+   Tacet indicar e clique em Conceder Acesso.
+
+4. Ative os apps que você quer ocultar em Ocultar no Tacet. Depois,
+   segure ⌘ e arraste a seta do Tacet para a direita deles.
+
+Clique na seta para mostrar os apps ocultos; clique de novo para
+escondê-los. Ao sair do Tacet, todos os ícones voltam. O beta funciona
+até {{EXPIRES_PT}}.
+
+Dúvidas ou sugestões: clique com o botão direito na seta do Tacet ›
+Enviar Comentários…
+https://gettacet.pages.dev
+
+
+────────────────────────────────────────
+
+TACET BETA — CÓMO INSTALAR
+
+Tacet necesita macOS 27 o posterior.
+
+1. Arrastra Tacet a la carpeta Aplicaciones.
+
+2. Abre Tacet desde Aplicaciones. macOS dirá que no puede verificar
+   Tacet, porque esta beta aún no está notarizada por Apple. Haz clic en
+   OK y luego: abre Ajustes del Sistema › Privacidad y seguridad, baja
+   hasta el mensaje sobre Tacet, haz clic en Abrir igualmente y confirma.
+   Solo tienes que hacerlo una vez.
+
+3. Tacet pide acceso a un archivo, donde macOS guarda los ajustes de la
+   barra de menús. Haz clic en Conceder acceso…, selecciona el archivo
+   que Tacet indique y haz clic en Conceder acceso.
+
+4. Activa las apps que quieres ocultar en Ocultar en Tacet. Después,
+   mantén pulsado ⌘ y arrastra la flecha de Tacet a la derecha de ellas.
+
+Haz clic en la flecha para mostrar las apps ocultas; vuelve a hacer clic
+para esconderlas. Al salir de Tacet, todos los iconos vuelven. La beta
+funciona hasta el {{EXPIRES_ES}}.
+
+Dudas o comentarios: clic derecho en la flecha de Tacet ›
+Enviar comentarios…
+https://gettacet.pages.dev
