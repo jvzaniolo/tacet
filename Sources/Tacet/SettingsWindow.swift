@@ -7,22 +7,28 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let model: ShelfModel
+    private let hotkey: Hotkey
+    private let loginItem: LoginItem
     private let ui = SettingsUIState()
     private var window: NSWindow?
     private var timer: Timer?
 
-    init(model: ShelfModel) {
+    init(model: ShelfModel, hotkey: Hotkey, loginItem: LoginItem) {
         self.model = model
+        self.hotkey = hotkey
+        self.loginItem = loginItem
     }
 
     var needsWelcome: Bool { model.access != .granted || !ui.didOnboard }
 
     func show() {
         model.refresh()
+        loginItem.refresh()
+        hotkey.retryIfTaken()
         ui.animationStart = .now
         ui.animationRuns = 2
         if window == nil {
-            let view = SettingsRoot(model: model, ui: ui)
+            let view = SettingsRoot(model: model, hotkey: hotkey, loginItem: loginItem, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Tacet"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -34,6 +40,10 @@ final class SettingsWindowController {
             }
             center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateRefreshing() }
+            }
+            // Back from System Settings › Login Items & Extensions.
+            center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.loginItem.refresh() }
             }
             self.window = window
         }
@@ -72,6 +82,7 @@ final class SettingsUIState {
     /// for the play button (one run per click).
     var animationStart: Date?
     var animationRuns = 2
+    let recorder = ShortcutRecording()
 
     var didOnboard = UserDefaults.standard.bool(forKey: key) {
         didSet { UserDefaults.standard.set(didOnboard, forKey: Self.key) }
@@ -80,12 +91,14 @@ final class SettingsUIState {
 
 private struct SettingsRoot: View {
     let model: ShelfModel
+    let hotkey: Hotkey
+    let loginItem: LoginItem
     let ui: SettingsUIState
 
     var body: some View {
         Group {
             if model.access == .granted && ui.didOnboard {
-                AppListView(model: model, ui: ui)
+                AppListView(model: model, hotkey: hotkey, loginItem: loginItem, ui: ui)
             } else {
                 WelcomeView(model: model, ui: ui)
             }
@@ -179,6 +192,8 @@ private struct Point: View {
 
 private struct AppListView: View {
     let model: ShelfModel
+    let hotkey: Hotkey
+    let loginItem: LoginItem
     let ui: SettingsUIState
 
     private var managed: [ShelfModel.Row] { model.rows.filter { $0.status != .offInSystemSettings } }
@@ -192,6 +207,7 @@ private struct AppListView: View {
             if model.hasHiddenApps {
                 ArrowPlacementSection(ui: ui)
             }
+            GeneralSection(hotkey: hotkey, loginItem: loginItem, recorder: ui.recorder)
 
             Section {
                 if managed.isEmpty {
@@ -246,6 +262,165 @@ private struct AppListView: View {
         }
         .formStyle(.grouped)
         .frame(minHeight: 560)
+    }
+}
+
+// MARK: Open at Login and the shortcut
+
+private struct GeneralSection: View {
+    let hotkey: Hotkey
+    let loginItem: LoginItem
+    let recorder: ShortcutRecording
+
+    var body: some View {
+        Section {
+            Toggle("Open at Login", isOn: Binding(
+                get: { loginItem.isOn },
+                set: { loginItem.set($0) }
+            ))
+            .toggleStyle(.switch)
+            if loginItem.needsApproval {
+                // Turned off in System Settings, or waiting for the user's OK.
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Open Login Items & Extensions…") { loginItem.openLoginItems() }
+                }
+            }
+            if let error = loginItem.lastError {
+                Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Keyboard Shortcut")
+                    Group {
+                        if recorder.isRecording {
+                            Text("Type the new shortcut, or press Esc to remove it.")
+                        } else {
+                            Text("Shows and hides the hidden apps from any app, like clicking the arrow.")
+                        }
+                    }
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                ShortcutRecorder(hotkey: hotkey, recorder: recorder)
+            }
+            if let message {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var message: LocalizedStringKey? {
+        switch recorder.problem {
+        case .needsModifier: return "Use ⌘, ⌥ or ⌃ in the shortcut."
+        case .system(let keys): return "\(keys) is used by macOS. Choose a different shortcut."
+        case .taken(let keys): return "\(keys) is already used by another app. Choose a different shortcut."
+        case nil:
+            guard let shortcut = hotkey.shortcut, hotkey.isTaken else { return nil }
+            return "\(shortcut.display) is already used by another app. Choose a different shortcut."
+        }
+    }
+}
+
+/// Recording a new shortcut: click, then type it; Esc removes it, a click
+/// elsewhere keeps the current one. A local
+/// monitor on Tacet's own window, so no permission is involved. The current
+/// shortcut is paused meanwhile, so typing it again reaches the recorder.
+/// (A class, not @State: SwiftUI's @State is a macro the Command Line
+/// Tools can't expand.)
+@MainActor
+@Observable
+final class ShortcutRecording {
+    private(set) var isRecording = false
+    private(set) var held: NSEvent.ModifierFlags = []
+    var problem: Hotkey.Problem?
+    @ObservationIgnored private var monitor: Any?
+
+    func start(_ hotkey: Hotkey) {
+        problem = nil
+        hotkey.pause()
+        isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            let consumed = MainActor.assumeIsolated { self?.handle(event, hotkey) ?? false }
+            return consumed ? nil : event
+        }
+    }
+
+    /// True when the event is the recorder's (not passed on).
+    private func handle(_ event: NSEvent, _ hotkey: Hotkey) -> Bool {
+        let shortcut = Shortcut(event: event)
+        if event.type == .flagsChanged {
+            held = shortcut.modifiers
+            return false
+        }
+        if event.keyCode == 53 && shortcut.modifiers.isEmpty {   // Esc
+            problem = nil
+            hotkey.remove()
+            stop(hotkey)
+            return true
+        }
+        problem = hotkey.change(to: shortcut)
+        // Without ⌘, ⌥ or ⌃, keep listening for a better one.
+        if problem != .needsModifier { stop(hotkey) }
+        return true
+    }
+
+    func stop(_ hotkey: Hotkey) {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        guard isRecording else { return }
+        isRecording = false
+        held = []
+        hotkey.resume()
+    }
+}
+
+private struct ShortcutRecorder: View {
+    let hotkey: Hotkey
+    let recorder: ShortcutRecording
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if hotkey.shortcut != .standard && !recorder.isRecording {
+                Button {
+                    recorder.problem = hotkey.restoreDefault()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(Text("Restore Default"))
+                .accessibilityLabel(Text("Restore Default"))
+            }
+            Button {
+                if recorder.isRecording { recorder.stop(hotkey) } else { recorder.start(hotkey) }
+            } label: {
+                Group {
+                    if !recorder.isRecording {
+                        if let shortcut = hotkey.shortcut {
+                            Text(verbatim: shortcut.display)
+                        } else {
+                            Text("Record Shortcut")
+                        }
+                    } else if recorder.held.isEmpty {
+                        Text("Type Shortcut")
+                    } else {
+                        Text(verbatim: Shortcut.symbols(recorder.held))
+                    }
+                }
+                .frame(minWidth: 90)
+            }
+            .help(Text("Click, then type the new shortcut. Esc removes it."))
+        }
+        .onDisappear { recorder.stop(hotkey) }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in recorder.stop(hotkey) }
     }
 }
 

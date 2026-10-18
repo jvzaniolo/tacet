@@ -34,6 +34,22 @@
 "Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over." = "Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over.";
 "Tacet couldn’t change the menu bar switches." = "Tacet couldn’t change the menu bar switches.";
 
+/* Open at Login and the keyboard shortcut (macOS's own terms) */
+"Open at Login" = "Open at Login";
+"Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login." = "Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login.";
+"Open Login Items & Extensions…" = "Open Login Items & Extensions…";
+"Keyboard Shortcut" = "Keyboard Shortcut";
+"Shows and hides the hidden apps from any app, like clicking the arrow." = "Shows and hides the hidden apps from any app, like clicking the arrow.";
+"Type Shortcut" = "Type Shortcut";
+"Type the new shortcut, or press Esc to remove it." = "Type the new shortcut, or press Esc to remove it.";
+"Record Shortcut" = "Record Shortcut";
+"Click, then type the new shortcut. Esc removes it." = "Click, then type the new shortcut. Esc removes it.";
+"Restore Default" = "Restore Default";
+"Use ⌘, ⌥ or ⌃ in the shortcut." = "Use ⌘, ⌥ or ⌃ in the shortcut.";
+"%@ is used by macOS. Choose a different shortcut." = "%@ is used by macOS. Choose a different shortcut.";
+"%@ is already used by another app. Choose a different shortcut." = "%@ is already used by another app. Choose a different shortcut.";
+"Space" = "Space";
+
 /* Arrow Position */
 "Arrow Position" = "Arrow Position";
 "Play Animation" = "Play Animation";
@@ -42,8 +58,9 @@
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Show Hidden Menu Bar Items";
 "Hide Menu Bar Items" = "Hide Menu Bar Items";
+"Show Hidden Items" = "Show Hidden Items";
+"Hide Items" = "Hide Items";
 "Settings…" = "Settings…";
-"Keep Open" = "Keep Open";
 "Quit Tacet" = "Quit Tacet";
 
 /* Beta */

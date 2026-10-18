@@ -11,13 +11,19 @@ final class ShelfController {
     private let arrow = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var mouseMonitor: Any?
     private var keyMonitor: Any?
-    /// Keep Open: stays revealed until the arrow is clicked.
-    private var pinned = false
     /// Windows the hidden apps had on screen when revealed; newer ones are
     /// their menus or popovers.
     private var revealBaseline: Set<CGWindowID> = []
+    private var autoHideTimer: Timer?
+    /// When the apps hide again on their own; nil while the countdown waits
+    /// (the pointer is on the menu bar, or a menu is open).
+    private var autoHideDeadline: Date?
+    /// Fixed, no setting: 5 s felt rushed.
+    private static let autoHideDelay: TimeInterval = 10
 
     var openSettings: (() -> Void)?
+    /// The global shortcut, shown next to the menu's show/hide item while on.
+    var hotkey: Hotkey?
     /// Beta build past its expiry: the arrow shows the "beta has ended" window.
     var showExpired: (() -> Void)?
 
@@ -47,19 +53,19 @@ final class ShelfController {
     // MARK: States
 
     func conceal() {
-        pinned = false
         removeMonitors()
+        stopAutoHide()
         model.conceal()
         render()
     }
 
-    func reveal(pinned: Bool = false) {
-        self.pinned = pinned
+    func reveal() {
         let pids = hiddenPIDs()
         revealBaseline = Set(MenuTracker.allWindows().filter { pids.contains($0.pid) }.map(\.id))
         model.reveal()
         render()
-        if pinned { removeMonitors() } else { installMonitors() }
+        installMonitors()
+        startAutoHide()
     }
 
     private func render() {
@@ -98,6 +104,11 @@ final class ShelfController {
                 return
             }
         }
+        toggle()
+    }
+
+    /// A click on the arrow, or the global shortcut.
+    func toggle() {
         if model.expired {
             showExpired?()
             return
@@ -112,11 +123,16 @@ final class ShelfController {
 
     private func showMenu() {
         let menu = NSMenu()
+        if let hotkey, let shortcut = hotkey.shortcut, hotkey.isActive, model.access == .granted, model.hasHiddenApps || model.revealed, !model.expired {
+            // Shorter than the arrow's labels, so the menu stays narrow; the
+            // item exists to show the shortcut.
+            let title = model.revealed ? String(localized: "Hide Items") : String(localized: "Show Hidden Items")
+            let item = menu.addItem(withTitle: title, action: #selector(menuToggle), keyEquivalent: shortcut.keyEquivalent)
+            item.keyEquivalentModifierMask = shortcut.modifiers
+            item.target = self
+            menu.addItem(.separator())
+        }
         menu.addItem(withTitle: String(localized: "Settings…"), action: #selector(menuSettings), keyEquivalent: ",").target = self
-        let showAll = menu.addItem(withTitle: String(localized: "Keep Open"), action: #selector(menuShowAll), keyEquivalent: "")
-        showAll.target = self
-        showAll.state = pinned ? .on : .off
-        showAll.isEnabled = !model.expired
         if BuildInfo.feedbackURL != nil {
             menu.addItem(withTitle: String(localized: "Send Feedback…"), action: #selector(menuFeedback), keyEquivalent: "").target = self
         }
@@ -134,21 +150,22 @@ final class ShelfController {
         arrow.menu = nil
     }
 
+    @objc private func menuToggle() { toggle() }
     @objc private func menuSettings() { openSettings?() }
     @objc private func menuFeedback() { BuildInfo.feedbackURL.map { _ = NSWorkspace.shared.open($0) } }
-    @objc private func menuShowAll() { if pinned { conceal() } else { reveal(pinned: true) } }
 
     // MARK: Close rules (like the native overflow arrow)
 
     /// While revealed: a click outside the menu bar and outside any menu or
     /// popover of the revealed apps conceals; so does Esc with no menu open.
-    /// Clicks on the bar itself (other items) keep it open. No timer.
+    /// Clicks on the bar itself (other items) keep it open. It also hides
+    /// again on its own (see autoHideTick).
     private func installMonitors() {
         removeMonitors()
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                guard let self, self.model.revealed, !self.pinned else { return }
+                guard let self, self.model.revealed else { return }
                 if Self.isInMenuBar(location) || self.isInMenu(location) { return }
                 self.conceal()
             }
@@ -159,7 +176,7 @@ final class ShelfController {
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
             MainActor.assumeIsolated {
-                guard let self, self.model.revealed, !self.pinned, !self.isAnyMenuOpen() else { return }
+                guard let self, self.model.revealed, !self.isAnyMenuOpen() else { return }
                 self.conceal()
             }
         }
@@ -203,9 +220,60 @@ final class ShelfController {
 
     private func isAnyMenuOpen() -> Bool { !menuWindows().isEmpty }
 
+    // MARK: Hiding again on their own
+
+    /// Conceals after `autoHideDelay` with the pointer away from the menu
+    /// bar and no menu open, the same way a click on the arrow does. The
+    /// pointer on the bar or an open menu resets the countdown, so an icon
+    /// the user is about to click never disappears. Polls the pointer (no
+    /// permission needed) only while revealed.
+    private func startAutoHide() {
+        stopAutoHide()
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.autoHideTick() }
+        }
+        timer.tolerance = 0.1
+        RunLoop.main.add(timer, forMode: .common)   // also while a menu tracks
+        autoHideTimer = timer
+    }
+
+    private func stopAutoHide() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
+        autoHideDeadline = nil
+    }
+
+    private func autoHideTick() {
+        guard model.revealed else {
+            stopAutoHide()
+            return
+        }
+        // The pointer check first: it's free, the window list isn't.
+        if Self.isInMenuBar(NSEvent.mouseLocation) || isMenuOrPopoverOpen() {
+            autoHideDeadline = nil
+            return
+        }
+        guard let deadline = autoHideDeadline else {
+            autoHideDeadline = Date().addingTimeInterval(Self.autoHideDelay)
+            return
+        }
+        if Date() >= deadline {
+            Log.write("Hiding again after \(Int(Self.autoHideDelay)) s away from the menu bar")
+            conceal()
+        }
+    }
+
+    /// Menus (any app), and windows the revealed apps opened above the
+    /// normal level since revealing (their popovers and panels). A regular
+    /// window one of them opened, like its settings, doesn't hold it open.
+    private func isMenuOrPopoverOpen() -> Bool {
+        menuWindows().contains { $0.isMenu || $0.layer > Int(CGWindowLevelForKey(.normalWindow)) }
+    }
+
     /// Quit: every app Tacet switched off is turned back on.
     func prepareForTermination() {
         removeMonitors()
+        stopAutoHide()
         let ok = model.restoreAll()
         Log.write("Quit: restored hidden apps (\(ok ? "ok" : "failed"))")
     }

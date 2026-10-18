@@ -34,6 +34,22 @@
 "Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over." = "Consejo: arrastra con ⌘ las apps ocultas al extremo izquierdo de la barra de menús. Así aparecen y desaparecen rápido; en otro sitio, los iconos de al lado se desplazan.";
 "Tacet couldn’t change the menu bar switches." = "Tacet no ha podido cambiar los ajustes de la barra de menús.";
 
+/* Open at Login and the keyboard shortcut (macOS's own terms) */
+"Open at Login" = "Abrir al iniciar sesión";
+"Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login." = "Tacet está desactivado en Ajustes del Sistema › General › Ítems de inicio y extensiones. Actívalo allí para abrir Tacet al iniciar sesión.";
+"Open Login Items & Extensions…" = "Abrir ítems de inicio y extensiones…";
+"Keyboard Shortcut" = "Atajo de teclado";
+"Shows and hides the hidden apps from any app, like clicking the arrow." = "Muestra y oculta las apps ocultas desde cualquier app, como hacer clic en la flecha.";
+"Type Shortcut" = "Pulsa el atajo";
+"Type the new shortcut, or press Esc to remove it." = "Pulsa el nuevo atajo o Esc para eliminarlo.";
+"Record Shortcut" = "Grabar atajo";
+"Click, then type the new shortcut. Esc removes it." = "Haz clic y pulsa el nuevo atajo. Esc lo elimina.";
+"Restore Default" = "Restaurar valor por omisión";
+"Use ⌘, ⌥ or ⌃ in the shortcut." = "Usa ⌘, ⌥ o ⌃ en el atajo.";
+"%@ is used by macOS. Choose a different shortcut." = "macOS usa %@. Elige otro atajo.";
+"%@ is already used by another app. Choose a different shortcut." = "Otra app ya usa %@. Elige otro atajo.";
+"Space" = "Espacio";
+
 /* Arrow Position */
 "Arrow Position" = "Posición de la flecha";
 "Play Animation" = "Reproducir animación";
@@ -42,8 +58,9 @@
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Mostrar los ítems ocultos de la barra de menús";
 "Hide Menu Bar Items" = "Ocultar los ítems de la barra de menús";
+"Show Hidden Items" = "Mostrar ítems ocultos";
+"Hide Items" = "Ocultar ítems";
 "Settings…" = "Ajustes…";
-"Keep Open" = "Mantener abierto";
 "Quit Tacet" = "Salir de Tacet";
 
 /* Beta */

@@ -31,6 +31,12 @@ arrow, using macOS's own "Allow in the Menu Bar" switches.
 5. Turn on the apps you want hidden under **Hide in Tacet**. Hold ⌘ and drag
    Tacet's arrow to the right of them once.
 
+Click the arrow, or press **⇧⌘<** from any app, to show or hide them. In
+Settings (right-click the arrow › **Settings…**) you can change or remove
+that shortcut and turn on **Open at Login**. Shown apps hide again by
+themselves a few seconds after the pointer leaves the menu bar (never while a
+menu is open).
+
 Hidden apps show as "off" in System Settings › Menu Bar. Quitting Tacet turns
 them all back on; quit Tacet before deleting it.
 

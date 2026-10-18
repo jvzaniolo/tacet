@@ -4,7 +4,9 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = ShelfModel()
     private lazy var shelf = ShelfController(model: model)
-    private lazy var settings = SettingsWindowController(model: model)
+    private let hotkey = Hotkey()
+    private let loginItem = LoginItem()
+    private lazy var settings = SettingsWindowController(model: model, hotkey: hotkey, loginItem: loginItem)
     private var signalSources: [DispatchSourceSignal] = []
     private let expiredWindow = BetaExpiredWindowController()
     private var expiryTimer: Timer?
@@ -21,7 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if BuildInfo.isExpired {
             model.expire()
         }
+        shelf.hotkey = hotkey
         shelf.start()
+        hotkey.onPress = { [weak self] in self?.shelf.toggle() }
+        hotkey.start()
+        loginItem.refresh()
         if model.expired {
             expiredWindow.show()
         } else if settings.needsWelcome {

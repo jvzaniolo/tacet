@@ -77,7 +77,26 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
 - **Show / hide:** click « to show the hidden apps in their real places (menus
   open under them, as usual). Click », anywhere outside the menu bar, or Esc
   with no menu open (Esc only if Tacet has Accessibility, which it doesn't
-  ask for) to hide them again. Right-click › **Keep Open** keeps them shown until you click the arrow.
+  ask for) to hide them again.
+- **Keyboard shortcut:** ⇧⌘< (Shift-comma on US and ABNT2 keyboards) does
+  the same as clicking the arrow, from any app; the right-click menu shows it
+  next to its show/hide item. In Settings, click it and type a new one, or
+  press Esc to remove it (⌘, ⌥ or ⌃ required; macOS's own shortcuts are
+  refused; a click elsewhere keeps the current one). If another app already registered it,
+  Settings says so. Registered with Carbon's `RegisterEventHotKey`, which
+  needs no permission (an event tap or global key monitor would need Input
+  Monitoring or Accessibility).
+- **Hiding again on their own:** 10 seconds after the pointer leaves the
+  menu bar, the shown apps hide again, the same way a click on the arrow
+  does (fixed, no setting). The countdown runs only while the pointer is off
+  the menu bar and no menu or popover is open; either one starts it over, so
+  an icon you're about to click never disappears. The pointer is polled
+  (`NSEvent.mouseLocation`, no permission) only while the apps are shown.
+- **Open at Login:** a switch in Settings, off by default
+  (`SMAppService.mainApp`). Its state is read from macOS each time Settings
+  opens, since it can be turned off in System Settings › General › Login
+  Items & Extensions; while macOS has it off or waits for approval, Settings
+  says so and links there.
 - **Three states:** Visible, Hidden (by Tacet), and Off in System Settings
   (turned off outside Tacet: listed, never turned on by «). Changes made in
   System Settings are respected: turning a hidden app on there makes it
@@ -101,8 +120,10 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
 | --- | --- | --- |
 | Access to `group.com.apple.controlcenter.plist` | Reading and changing the switches (both need it: cfprefsd enforces the group-container protection, NOTES §13) | One-time open panel in onboarding; Tacet keeps a security-scoped bookmark. Full Disk Access would also work. |
 
-No TCC permission (Accessibility, Screen Recording) is needed. Tacet never
-changes System Settings itself beyond the switches of the apps you hide.
+No TCC permission (Accessibility, Input Monitoring, Screen Recording) is
+needed, the keyboard shortcut included. Tacet never changes System Settings
+itself beyond the switches of the apps you hide (and its own login item, when
+you turn on Open at Login).
 
 **Signing:** the build script signs with `SIGN_IDENTITY`, else the first
 code-signing identity whose name starts with "Tacet" or "MenuShel" (the
@@ -192,8 +213,10 @@ Sources/Tacet/
   AppFocus.swift              Brings Tacet's windows forward, focused
   MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
   ShelfModel.swift            Hidden apps, three states, reconcile, journal
-  ShelfController.swift       The arrow, its menu and the close rules
-  SettingsWindow.swift        Welcome/access step and the app list (SwiftUI)
+  ShelfController.swift       The arrow, its menu, the close rules and the 10 s auto-hide
+  SettingsWindow.swift        Welcome/access step, the app list, Open at Login and the shortcut recorder (SwiftUI)
+  Hotkey.swift                The global shortcut (Carbon hot key) and how it's shown
+  LoginItem.swift             Open at Login (SMAppService)
   MenuTracker.swift           On-screen menus/popovers via CGWindowList
   Beta.swift                  Build info, beta expiry window, feedback link
   Log.swift                   Console / unified log / ~/Library/Logs output

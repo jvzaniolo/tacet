@@ -32,6 +32,12 @@ Menus" do macOS.
 5. Ative em **Ocultar no Tacet** os apps que você quer ocultar. Mantenha ⌘
    pressionado e arraste a seta do Tacet para a direita deles uma vez.
 
+Clique na seta, ou pressione **⇧⌘<** em qualquer app, para mostrá-los ou
+ocultá-los. Nos Ajustes (botão direito na seta › **Ajustes…**) você pode
+mudar ou remover esse atalho e ativar **Abrir no Início da Sessão**. Os apps
+mostrados se ocultam sozinhos alguns segundos depois que o ponteiro sai da
+Barra de Menus (nunca com um menu aberto).
+
 Os apps ocultos aparecem "desativados" em Ajustes do Sistema › Barra de
 Menus. Encerrar o Tacet reativa todos; encerre o Tacet antes de apagá-lo.
 
