@@ -4,16 +4,26 @@
 - Every user-facing literal found in Sources/ (Text, Button, Label, Toggle,
   Point titles/texts, String(localized:)) must be a key in en.lproj.
 - Every language must have exactly the keys of en.lproj.
-Interpolations like \\(name) become %@, as Swift does for String values.
+Keys come from Localizable.strings and Localizable.stringsdict (plurals).
+Interpolations like \\(name) become %@; since the source doesn't say a
+value's type, %lld (an Int, as Swift writes it) also matches %@.
 Usage: scripts/check-localizations.py   (exit 1 on problems)
 """
 import glob, os, re, subprocess, sys, json
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 
-def keys(path):
-    out = subprocess.run(["plutil", "-convert", "json", "-o", "-", path], capture_output=True, text=True, check=True).stdout
-    return set(json.loads(out).keys())
+def keys(lproj):
+    found = set()
+    for name in ("Localizable.strings", "Localizable.stringsdict"):
+        path = os.path.join(lproj, name)
+        if os.path.exists(path):
+            out = subprocess.run(["plutil", "-convert", "json", "-o", "-", path], capture_output=True, text=True, check=True).stdout
+            found |= set(json.loads(out).keys())
+    return found
+
+def loose(key):
+    return re.sub(r"%(?:lld|ld|d)", "%@", key)
 
 literal = r'"((?:[^"\\]|\\.)*)"'
 patterns = [
@@ -33,13 +43,14 @@ for path in glob.glob(os.path.join(root, "Sources/Tacet/*.swift")):
             key = re.sub(r"\\\([^)]*\)", "%@", raw).replace("\\n", "\n")
             found.setdefault(key, os.path.basename(path))
 
-base = keys(os.path.join(root, "Resources/en.lproj/Localizable.strings"))
+base = keys(os.path.join(root, "Resources/en.lproj"))
+loose_base = {loose(k) for k in base}
 problems = []
 for key, file in sorted(found.items()):
-    if key not in base:
+    if key not in loose_base:
         problems.append(f"missing in en.lproj ({file}): {key!r}")
-for path in sorted(glob.glob(os.path.join(root, "Resources/*.lproj/Localizable.strings"))):
-    lang = os.path.basename(os.path.dirname(path))
+for path in sorted(glob.glob(os.path.join(root, "Resources/*.lproj"))):
+    lang = os.path.basename(path)
     k = keys(path)
     for key in sorted(base - k):
         problems.append(f"{lang}: missing {key!r}")

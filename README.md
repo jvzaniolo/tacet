@@ -137,6 +137,9 @@ Portuguese (`pt-BR`) and Spanish (`es`).
 - Strings live in `Resources/<lang>.lproj/Localizable.strings`. Keys are the
   English text as written in the source; `%@` stands for an interpolated
   value (an app name, a file name). `en.lproj` lists every key.
+- Plurals ("ends in 1 day" / "60 days") live in
+  `Resources/<lang>.lproj/Localizable.stringsdict`; the key has `%lld`
+  where the source interpolates an `Int`.
 - SwiftUI `Text`, `Button`, `Label` and `Toggle` literals are looked up
   automatically; AppKit strings use `String(localized:)`.
 - A String Catalog (`.xcstrings`) isn't used: compiling one needs

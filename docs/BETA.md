@@ -8,8 +8,8 @@ arrow, using macOS's own "Allow in the Menu Bar" switches.
 ## Requirements
 
 - macOS 27 or later.
-- The beta expires 60 days after it was built (the date is shown in Tacet's
-  right-click menu). When it ends, Tacet stops hiding and turns everything
+- The beta expires 60 days after it was built. Tacet's right-click menu
+  shows the days left, and the bottom of its Settings window the date. When it ends, Tacet stops hiding and turns everything
   back on.
 
 ## Install

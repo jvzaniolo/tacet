@@ -65,7 +65,10 @@
 
 /* Beta */
 "Send Feedback…" = "Send Feedback…";
-"Beta %@ · ends %@" = "Beta %@ · ends %@";
+"Beta %@ · ends today" = "Beta %@ · ends today";
+"Beta %@ · ends tomorrow" = "Beta %@ · ends tomorrow";
+"Beta %@ · ends on %@" = "Beta %@ · ends on %@";
+/* "Beta %@ · ends in %lld days" is in Localizable.stringsdict (plural rules) */
 "This Tacet beta has ended" = "This Tacet beta has ended";
 "Thank you for testing Tacet! This beta ended on %@. Tacet no longer hides anything, and your menu bar apps are all shown again." = "Thank you for testing Tacet! This beta ended on %@. Tacet no longer hides anything, and your menu bar apps are all shown again.";
 "Get the latest version on the Tacet website." = "Get the latest version on the Tacet website.";

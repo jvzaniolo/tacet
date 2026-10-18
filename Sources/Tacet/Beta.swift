@@ -51,6 +51,31 @@ enum BuildInfo {
     static var expiryText: String {
         betaExpiry.map { $0.formatted(date: .long, time: .omitted) } ?? ""
     }
+
+    /// "Beta 2 (0.1.0)", or the version alone without a beta number.
+    static var betaLabel: String {
+        betaNumber.map { "\($0) (\(shortVersion))" } ?? shortVersion
+    }
+
+    /// Calendar days from today to the expiry day in the user's time zone:
+    /// a beta that ends tomorrow at any hour has 1 day left.
+    static var betaDaysLeft: Int? {
+        betaExpiry.map { expiry in
+            let calendar = Calendar.current
+            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: expiry)).day ?? 0
+            return max(days, 0)
+        }
+    }
+
+    /// For the arrow's menu, read again each time it opens: "Beta 2 (0.1.0)
+    /// · ends in 60 days" (plural rules in Localizable.stringsdict).
+    static var betaMenuText: String {
+        switch betaDaysLeft ?? 0 {
+        case 0: String(localized: "Beta \(betaLabel) · ends today")
+        case 1: String(localized: "Beta \(betaLabel) · ends tomorrow")
+        case let days: String(localized: "Beta \(betaLabel) · ends in \(days) days")
+        }
+    }
 }
 
 /// "This beta has ended": shown once the beta build expires, and whenever the

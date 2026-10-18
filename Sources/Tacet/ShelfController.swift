@@ -138,9 +138,8 @@ final class ShelfController {
         }
         if BuildInfo.isBeta {
             menu.addItem(.separator())
-            // "Beta 2 (0.1.0) · ends 15 Dec 2026"
-            let label = BuildInfo.betaNumber.map { "\($0) (\(BuildInfo.shortVersion))" } ?? BuildInfo.shortVersion
-            let beta = menu.addItem(withTitle: String(localized: "Beta \(label) · ends \(BuildInfo.expiryText)"), action: nil, keyEquivalent: "")
+            // "Beta 2 (0.1.0) · ends in 60 days"; Settings shows the date.
+            let beta = menu.addItem(withTitle: BuildInfo.betaMenuText, action: nil, keyEquivalent: "")
             beta.isEnabled = false
         }
         menu.addItem(.separator())

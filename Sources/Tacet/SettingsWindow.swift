@@ -96,11 +96,19 @@ private struct SettingsRoot: View {
     let ui: SettingsUIState
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if model.access == .granted && ui.didOnboard {
                 AppListView(model: model, hotkey: hotkey, loginItem: loginItem, ui: ui)
             } else {
                 WelcomeView(model: model, ui: ui)
+            }
+            if BuildInfo.isBeta {
+                // "Beta 2 (0.1.0) · ends on December 15, 2026"
+                Text("Beta \(BuildInfo.betaLabel) · ends on \(BuildInfo.expiryText)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
             }
         }
         .frame(width: 480)

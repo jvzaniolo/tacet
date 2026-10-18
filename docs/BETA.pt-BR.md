@@ -9,8 +9,8 @@ Menus" do macOS.
 ## Requisitos
 
 - macOS 27 ou posterior.
-- O beta expira 60 dias depois de ser gerado (a data aparece no menu do
-  clique direito do Tacet). Quando termina, o Tacet para de ocultar e reativa
+- O beta expira 60 dias depois de ser gerado. O menu do clique direito do
+  Tacet mostra quantos dias faltam, e o rodapé dos Ajustes, a data. Quando termina, o Tacet para de ocultar e reativa
   tudo.
 
 ## Instalação
