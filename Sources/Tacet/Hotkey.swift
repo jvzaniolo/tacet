@@ -117,10 +117,6 @@ final class Hotkey {
         Log.write("Shortcut: removed")
     }
 
-    func restoreDefault() -> Problem? {
-        shortcut == .standard ? nil : change(to: .standard)
-    }
-
     private func apply() {
         unregister()
         guard let shortcut, !isPaused else {

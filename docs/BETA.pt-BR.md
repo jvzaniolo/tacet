@@ -25,12 +25,14 @@ Menus" do macOS.
      mensagem sobre o Tacet, clique em **Abrir Mesmo Assim** e confirme; ou
    - no Terminal: `xattr -dr com.apple.quarantine /Applications/Tacet.app`,
      e abra o Tacet de novo.
-4. O Tacet pede uma única coisa: acesso ao arquivo onde o macOS guarda os
-   ajustes da Barra de Menus. Clique em **Conceder Acesso…**, selecione
-   `group.com.apple.controlcenter.plist` na pasta que o Tacet abre e clique em
-   **Conceder Acesso**.
-5. Ative em **Ocultar no Tacet** os apps que você quer ocultar. Mantenha ⌘
-   pressionado e arraste a seta do Tacet para a direita deles uma vez.
+4. O Tacet pede uma única coisa: acesso às duas pastas onde o macOS guarda
+   os ajustes da Barra de Menus e a ordem dos ícones. Clique em **Conceder
+   Acesso…**, mantenha ⌘ pressionado e selecione
+   `group.com.apple.controlcenter` e `com.apple.MenuBar` (as únicas pastas
+   que dá para clicar) e clique em **Conceder Acesso**.
+5. Ative em **Ocultar no Tacet** os apps que você quer ocultar. O Tacet os
+   coloca à esquerda da seta sozinho e mantém essa ordem: um ícone arrastado
+   para fora do lugar volta.
 
 Clique na seta, ou pressione **⇧⌘<** em qualquer app, para mostrá-los ou
 ocultá-los. Nos Ajustes (botão direito na seta › **Ajustes…**) você pode

@@ -11,12 +11,12 @@ Tacet needs macOS 27 or later.
    about Tacet, click Open Anyway and confirm.
    You only need to do this once.
 
-3. Tacet asks for access to one file, where macOS keeps the menu bar
-   settings. Click Grant Access…, select the file Tacet points to, and
-   click Grant Access.
+3. Tacet asks for access to two folders, where macOS keeps the menu bar
+   settings. Click Grant Access…, hold ⌘ and select the two folders Tacet
+   points to (the only ones you can click), and click Grant Access.
 
-4. Turn on the apps you want to hide under Hide in Tacet. Then hold ⌘
-   and drag Tacet's arrow to the right of them.
+4. Turn on the apps you want to hide under Hide in Tacet. Tacet puts
+   them to the left of its arrow by itself.
 
 Click the arrow (or press ⇧⌘<) to show your hidden apps; click again to
 tuck them away. They also hide by themselves after a few seconds.
@@ -43,12 +43,13 @@ O Tacet precisa do macOS 27 ou mais recente.
    Abrir Mesmo Assim e confirme.
    Isso só precisa ser feito uma vez.
 
-3. O Tacet pede acesso a um arquivo, onde o macOS guarda os ajustes da
-   Barra de Menus. Clique em Conceder Acesso…, selecione o arquivo que o
-   Tacet indicar e clique em Conceder Acesso.
+3. O Tacet pede acesso a duas pastas, onde o macOS guarda os ajustes da
+   Barra de Menus. Clique em Conceder Acesso…, segure ⌘ e selecione as
+   duas pastas que o Tacet indicar (as únicas que dá para clicar) e
+   clique em Conceder Acesso.
 
-4. Ative os apps que você quer ocultar em Ocultar no Tacet. Depois,
-   segure ⌘ e arraste a seta do Tacet para a direita deles.
+4. Ative os apps que você quer ocultar em Ocultar no Tacet. O Tacet os
+   coloca à esquerda da seta sozinho.
 
 Clique na seta (ou aperte ⇧⌘<) para mostrar os apps ocultos; clique de
 novo para escondê-los. Eles também se escondem sozinhos depois de alguns
@@ -75,12 +76,13 @@ Tacet necesita macOS 27 o posterior.
    hasta el mensaje sobre Tacet, haz clic en Abrir igualmente y confirma.
    Solo tienes que hacerlo una vez.
 
-3. Tacet pide acceso a un archivo, donde macOS guarda los ajustes de la
-   barra de menús. Haz clic en Conceder acceso…, selecciona el archivo
-   que Tacet indique y haz clic en Conceder acceso.
+3. Tacet pide acceso a dos carpetas, donde macOS guarda los ajustes de
+   la barra de menús. Haz clic en Conceder acceso…, mantén pulsado ⌘,
+   selecciona las dos carpetas que Tacet indique (las únicas en las que
+   puedes hacer clic) y haz clic en Conceder acceso.
 
-4. Activa las apps que quieres ocultar en Ocultar en Tacet. Después,
-   mantén pulsado ⌘ y arrastra la flecha de Tacet a la derecha de ellas.
+4. Activa las apps que quieres ocultar en Ocultar en Tacet. Tacet las
+   coloca a la izquierda de su flecha automáticamente.
 
 Haz clic en la flecha (o pulsa ⇧⌘<) para mostrar las apps ocultas; vuelve
 a hacer clic para esconderlas. También se esconden solas tras unos

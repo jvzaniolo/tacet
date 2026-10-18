@@ -142,6 +142,14 @@ final class ShelfController {
             let item = menu.addItem(withTitle: title, action: #selector(menuToggle), keyEquivalent: shortcut.keyEquivalent)
             item.keyEquivalentModifierMask = shortcut.modifiers
             item.target = self
+            // Held ⌥ turns it into "Show All Items" with the ⌥ variant,
+            // as macOS menus do (an alternate item).
+            if !model.revealed, model.hasAlwaysHiddenApps, let variant = hotkey.variant, !hotkey.isVariantTaken {
+                let all = menu.addItem(withTitle: String(localized: "Show All Items"), action: #selector(menuToggleAll), keyEquivalent: shortcut.keyEquivalent)
+                all.keyEquivalentModifierMask = variant.modifiers
+                all.isAlternate = true
+                all.target = self
+            }
             menu.addItem(.separator())
         }
         menu.addItem(withTitle: String(localized: "Settings…"), action: #selector(menuSettings), keyEquivalent: ",").target = self
@@ -162,6 +170,7 @@ final class ShelfController {
     }
 
     @objc private func menuToggle() { toggle() }
+    @objc private func menuToggleAll() { toggle(all: true) }
     @objc private func menuSettings() { openSettings?() }
     @objc private func menuFeedback() { BuildInfo.feedbackURL.map { _ = NSWorkspace.shared.open($0) } }
 

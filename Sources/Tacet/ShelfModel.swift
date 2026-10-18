@@ -106,6 +106,13 @@ final class ShelfModel {
             if !orphaned.isEmpty { write(Dictionary(uniqueKeysWithValues: orphaned.map { ($0, true) })) }
         }
         reconcile(current)
+        if CommandLine.arguments.contains("--restore-order-backup") { MenuBarOrder.restoreBackup() }
+        if CommandLine.arguments.contains("--reset-order") { MenuBarOrder.resetArrow() }
+        // Before the arrow exists: a position written first is where it
+        // appears (NOTES §22). The hidden apps may still be on screen (Quit
+        // turned them on), so they're arranged at the first conceal.
+        arrangeIcons(hiddenOnScreen: true)
+        watchOrder()
     }
 
     /// Turns every app Tacet switched off back on (Quit).
@@ -124,7 +131,13 @@ final class ShelfModel {
     func requestAccess() {
         access = MenuBarSwitches.requestAccess()
         // Brings switches in line (e.g. hides again after access was lost).
-        if access == .granted { apply() } else { rows = [] }
+        if access == .granted {
+            apply()
+            arrangeIcons()
+            watchOrder()
+        } else {
+            rows = []
+        }
     }
 
     // MARK: Reading
@@ -192,7 +205,9 @@ final class ShelfModel {
             let info = info(for: id)
             let status: Status = hidden.contains(id) ? .hidden
                 : alwaysHidden.contains(id) ? .alwaysHidden
-                : (switches[id] == true ? .visible : .offInSystemSettings)
+                // Off but held by Tacet: on its way to Visible (relocate),
+                // not turned off in System Settings.
+                : (switches[id] == true || heldOff.contains(id) ? .visible : .offInSystemSettings)
             return Row(bundleID: id, name: info.name, icon: info.icon, status: status)
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -219,7 +234,7 @@ final class ShelfModel {
         } else {
             hidden.remove(id)
         }
-        apply()
+        relocate(id, to: hide ? .hidden : .visible)
     }
 
     /// Keep Always Hidden moves an app out of the list; Move Back returns
@@ -233,10 +248,15 @@ final class ShelfModel {
             alwaysHidden.remove(id)
             hidden.insert(id)
         }
-        apply()
+        relocate(id, to: always ? .alwaysHidden : .hidden)
     }
 
-    func conceal() { revealed = false; revealedAll = false; apply() }
+    func conceal() {
+        revealed = false
+        revealedAll = false
+        apply()
+        arrangeIcons()   // hidden ones are off screen now: fix them unseen
+    }
 
     /// The beta has ended: turn every switch Tacet changed back on, for good.
     func expire() {
@@ -246,7 +266,87 @@ final class ShelfModel {
         Log.write("Beta expired: restoring and no longer hiding")
         restoreAll()
     }
-    func reveal(all: Bool = false) { revealed = true; revealedAll = all; apply() }
+    func reveal(all: Bool = false) {
+        revealed = true
+        revealedAll = all
+        apply()
+        arrangeIcons()
+    }
+
+    // MARK: Order (NOTES §22)
+
+    /// Moves done but not yet switched back on (see relocate).
+    @ObservationIgnored private var relocating = 0
+    @ObservationIgnored private var orderCheck: DispatchWorkItem?
+    private static let orderError = String(localized: "Tacet couldn’t arrange the menu bar icons.")
+
+    /// `[always hidden] [hidden] « [visible]`; see MenuBarOrder.arrange.
+    private func arrangeIcons(moved: [String: MenuBarOrder.Group] = [:], hiddenOnScreen: Bool? = nil) {
+        guard access == .granted, !expired else { return }
+        let visible = Set(switches.keys).subtracting(hidden).subtracting(alwaysHidden)
+        let ok = MenuBarOrder.arrange(visible: visible, alwaysHidden: alwaysHidden, hidden: hidden, moved: moved,
+                                      hiddenOnScreen: hiddenOnScreen ?? revealed)
+        if !ok {
+            lastError = Self.orderError
+        } else if lastError == Self.orderError {
+            lastError = nil
+        }
+    }
+
+    /// An app changing group: switched off, its new position written while
+    /// it's off, then switched on if it should be on screen. No slide
+    /// across the bar. A short pause between steps lets MenuBarAgent take
+    /// each one in.
+    private func relocate(_ id: String, to group: MenuBarOrder.Group) {
+        rebuildRows()   // the switch in Settings follows at once
+        guard access == .granted, !expired, MenuBarOrder.hasKeys(id) else {
+            apply()
+            return
+        }
+        if switches[id] == true { write([id: false]) }
+        relocating += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            self.arrangeIcons(moved: [id: group])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.relocating -= 1
+                self.apply()
+            }
+        }
+    }
+
+    @ObservationIgnored private var dropMonitor: Any?
+
+    /// Two signals that the order may have changed: the table's folder
+    /// (MenuBarAgent's write reaches the disk late, up to many seconds)
+    /// and the end of any ⌘-drag (a global mouse-up monitor needs no
+    /// permission), so a dragged icon is put back soon after the drop.
+    private func watchOrder() {
+        MenuBarOrder.watch { [weak self] in self?.orderChanged() }
+        guard dropMonitor == nil else { return }
+        dropMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            guard event.modifierFlags.union(NSEvent.modifierFlags).contains(.command) else { return }
+            MainActor.assumeIsolated { self?.orderChanged() }
+        }
+    }
+
+    /// The table changed (a ⌘-drag, a new item, our own write): check the
+    /// order once things settle, never during a drag.
+    private func orderChanged() {
+        orderCheck?.cancel()
+        let check = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.relocating == 0 else { return }
+                if NSEvent.pressedMouseButtons != 0 {
+                    self.orderChanged()
+                    return
+                }
+                self.arrangeIcons()
+            }
+        }
+        orderCheck = check
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: check)
+    }
 
     /// Brings the switches in line with the hidden sets and the reveal
     /// state, in one write.

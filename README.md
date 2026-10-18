@@ -88,13 +88,16 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   ask for) to hide them again.
 - **Keyboard shortcut:** ⇧⌘< (Shift-comma on US and ABNT2 keyboards) does
   the same as clicking the arrow, from any app; the right-click menu shows
-  it next to its show/hide item. In Settings, click it and type a new one,
-  or press Esc to remove it (⌘, ⌥ or ⌃ required; macOS's own shortcuts are
-  refused; a click elsewhere keeps the current one). If another app
-  already registered it, Settings says so. The same keys with ⌥ added
-  (⌥⇧⌘< by default; none if the shortcut already has ⌥) do what ⌥-click
-  does, with the always-hidden apps too; a second hot key registered and
-  removed with the first, shown as a caption under it. Registered with
+  it next to its show/hide item. In Settings the shortcut field works like
+  System Settings › Keyboard Shortcuts: click it and type a new one (⌘, ⌥
+  or ⌃ required; macOS's own shortcuts are refused), Esc or a click
+  elsewhere keeps the current one, ⌫ or the ✕ in the field clears it. If
+  another app already registered it, Settings says so. The same keys with
+  ⌥ added (⌥⇧⌘< by default; none if the shortcut already has ⌥) do what
+  ⌥-click does, with the always-hidden apps too: a second hot key
+  registered and removed with the first, shown read-only in Settings under
+  the shortcut ("Toggle Always Hidden") and in the arrow's menu as the
+  ⌥ alternate of its first item ("Show All Items"). Registered with
   Carbon's `RegisterEventHotKey`, which needs no permission (an event tap
   or global key monitor would need Input Monitoring or Accessibility).
 - **Hiding again on their own:** 10 seconds after the pointer leaves the
@@ -119,18 +122,26 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   back on. Quit Tacet before deleting it. After a crash, the journal
   (`~/Library/Application Support/Tacet/journal.plist`) lets the next
   launch pick the hidden apps up again.
-- **Arrow position:** on a new install macOS puts Tacet's arrow at the far
-  left. Settings shows a short animation: click «, then hold ⌘ and drag the
-  arrow to the right of your hidden apps, once.
-- **Speed tip (optional):** ⌘-drag your hidden apps to the left end of the
-  menu bar. Then they fade in and out quickly (~0.15 s); elsewhere the icons
-  next to them slide over (~0.45 s).
+- **Icon order:** Tacet keeps `[always hidden] [hidden] « [visible]` by
+  writing macOS's own order table (`TrailingItemPreferredPositions` in the
+  `com.apple.MenuBar` container, what a ⌘-drag writes; NOTES §22). On first
+  run the arrow goes left of every icon, Apple's included. An app changing
+  group is switched off, its position written, then switched on if it
+  should show, so it never slides across the bar. A ⌘-drag that breaks the
+  order is undone: the arrow and visible icons once the drag ends (Tacet
+  watches the table's folder), hidden icons at the next hide, unseen. Each
+  group keeps its own order. Every write is read back and logged; one that
+  doesn't stick shows an error in Settings. Before its first write Tacet
+  copies the table to `~/Library/Application Support/Tacet/menubar-order-backup.plist`.
+  Quit doesn't restore the old order (the apps come back where they were
+  hidden, left of the arrow). Testing aids: `--reset-order` (forget the
+  arrow's position, as on a first install), `--restore-order-backup`.
 
 ## Permissions
 
 | Grant | Needed for | How |
 | --- | --- | --- |
-| Access to `group.com.apple.controlcenter.plist` | Reading and changing the switches (both need it: cfprefsd enforces the group-container protection, NOTES §13) | One-time open panel in onboarding; Tacet keeps a security-scoped bookmark. Full Disk Access would also work. |
+| Access to the folders `group.com.apple.controlcenter` and `com.apple.MenuBar` in `~/Library/Group Containers` | Reading and changing the switches and the icon order (cfprefsd enforces the group-container protection, NOTES §13, §22) | One open panel in onboarding: the user ⌘-clicks both folders (everything else is greyed out); Tacet keeps a security-scoped bookmark for each. Without both, Tacet stays on the grant screen. |
 
 No TCC permission (Accessibility, Input Monitoring, Screen Recording) is
 needed, the keyboard shortcut included. Tacet never changes System Settings
@@ -226,7 +237,9 @@ Resources/<lang>.lproj/       Localizable.strings per language (en, pt-BR, es)
 Sources/Tacet/
   main.swift, AppDelegate.swift   Launch, quit-time restore, signal handling
   AppFocus.swift              Brings Tacet's windows forward, focused
-  MenuBarSwitches.swift       Reads/writes the switches (private CF calls) + access
+  ContainerPrefs.swift        Group-container preferences through private CF calls
+  MenuBarSwitches.swift       Reads/writes the switches + the two-folder grant
+  MenuBarOrder.swift          Keeps the icon order in MenuBar's position table
   ShelfModel.swift            Hidden apps, three states, reconcile, journal
   ShelfController.swift       The arrow, its menu, the close rules and the 10 s auto-hide
   SettingsWindow.swift        Welcome/access step, the app list, Open at Login and the shortcut recorder (SwiftUI)

@@ -2,7 +2,7 @@
 """Checks Resources/*.lproj/Localizable.strings against the source.
 
 - Every user-facing literal found in Sources/ (Text, Button, Label, Toggle,
-  Point titles/texts, String(localized:)) must be a key in en.lproj.
+  LabeledContent, Point titles/texts, String(localized:)) must be a key in en.lproj.
 - Every language must have exactly the keys of en.lproj.
 Keys come from Localizable.strings and Localizable.stringsdict (plurals).
 Interpolations like \\(name) become %@; since the source doesn't say a
@@ -27,7 +27,7 @@ def loose(key):
 
 literal = r'"((?:[^"\\]|\\.)*)"'
 patterns = [
-    r'\b(?:Text|Button|Label|Toggle)\(\s*' + literal,
+    r'\b(?:Text|Button|Label|Toggle|LabeledContent)\(\s*' + literal,
     r'\b(?:title|text):\s*' + literal,
     r'String\(localized:\s*' + literal,
 ]

@@ -1,18 +1,17 @@
 import AppKit
-import UniformTypeIdentifiers
 
 /// The "Allow in the Menu Bar" switches of System Settings › Menu Bar
-/// (NOTES §12–13).
+/// (NOTES §12–13), and the grant Tacet needs for them and for the icon
+/// order (MenuBarOrder, NOTES §22).
 ///
 /// - Stored as `trackedApplications` in Control Center's group-container
 ///   preferences: a binary plist inside a Data value, an array of alternating
 ///   `{bundle: {_0: id}}` keys and `{isAllowed, location, menuItemLocations}`
 ///   values. A switch is the `isAllowed` flag.
-/// - Access: the user selects the plist once in an open panel; Tacet keeps
-///   a security-scoped bookmark.
-/// - Reads and writes go through CoreFoundation's container-aware preference
-///   calls (private, looked up by name), so MenuBarAgent sees a write within
-///   about a millisecond. The file on disk is flushed seconds later.
+/// - Access: one open panel where the user selects two folders,
+///   `group.com.apple.controlcenter` and `com.apple.MenuBar`; Tacet keeps a
+///   security-scoped bookmark for each. Without both it doesn't run.
+/// - Reads and writes go through ContainerPrefs.
 @MainActor
 enum MenuBarSwitches {
     struct App: Equatable {
@@ -22,99 +21,122 @@ enum MenuBarSwitches {
 
     enum Access: Equatable {
         case granted
-        case notGranted     // never granted
+        case notGranted     // never granted, or only one of the two folders
         case lost           // a bookmark exists but no longer works
     }
 
-    static let appID = "group.com.apple.controlcenter"
+    static let prefs = ContainerPrefs.controlCenter
     static let key = "trackedApplications"
-    static var containerURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Group Containers/\(appID)")
-    }
-    static var plistURL: URL { containerURL.appendingPathComponent("Library/Preferences/\(appID).plist") }
     /// System Settings › Menu Bar.
     static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.ControlCenter-Settings.extension")!
 
-    private static let bookmarkKey = "menuBarSettingsBookmark"
-    private static var scoped: URL?
-
-    // CoreFoundation private, container-aware preferences (dlsym by name).
-    private typealias CopyFn = @convention(c) (CFString, CFString, CFString) -> Unmanaged<CFPropertyList>?
-    private typealias SetFn = @convention(c) (CFString, CFPropertyList?, CFString, CFString) -> Void
-    private typealias SyncFn = @convention(c) (CFString, CFString) -> DarwinBoolean
-    private static let cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW)
-    private static let copyValue = dlsym(cf, "_CFPreferencesCopyAppValueWithContainer").map { unsafeBitCast($0, to: CopyFn.self) }
-    private static let setValue = dlsym(cf, "_CFPreferencesSetAppValueWithContainer").map { unsafeBitCast($0, to: SetFn.self) }
-    private static let sync = dlsym(cf, "_CFPreferencesAppSynchronizeWithContainer").map { unsafeBitCast($0, to: SyncFn.self) }
-
-    static var isSupported: Bool { copyValue != nil && setValue != nil && sync != nil }
+    static var isSupported: Bool { ContainerPrefs.isSupported }
 
     // MARK: Access
 
-    /// Resolves the bookmark (once per launch) and checks the file opens.
+    /// The two folders the grant covers.
+    static let containers = [ContainerPrefs.controlCenter, ContainerPrefs.menuBar]
+    private static var scoped: [String: URL] = [:]
+    private static func bookmarkKey(_ prefs: ContainerPrefs) -> String { "access.\(prefs.appID)" }
+
+    /// Both folders granted and their files open.
     static func checkAccess() -> Access {
-        if scoped == nil {
-            guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return .notGranted }
-            var stale = false
-            guard let url = try? URL(resolvingBookmarkData: data, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale),
-                  url.standardizedFileURL.path == plistURL.standardizedFileURL.path,
-                  url.startAccessingSecurityScopedResource() else {
-                Log.write("Switches: the saved access no longer resolves")
-                return .lost
-            }
-            scoped = url
-            if stale, let fresh = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) {
-                UserDefaults.standard.set(fresh, forKey: bookmarkKey)
-                Log.write("Switches: refreshed a stale bookmark")
+        var missing = false
+        for prefs in containers {
+            switch access(to: prefs) {
+            case .granted: continue
+            case .notGranted: missing = true
+            case .lost: return .lost
             }
         }
-        guard canOpenFile() else {
-            Log.write("Switches: can't open \(plistURL.lastPathComponent)")
-            scoped?.stopAccessingSecurityScopedResource()
-            scoped = nil
+        return missing ? .notGranted : .granted
+    }
+
+    /// Resolves the folder's bookmark (once per launch) and checks its
+    /// preferences file opens.
+    private static func access(to prefs: ContainerPrefs) -> Access {
+        if scoped[prefs.appID] == nil {
+            guard let data = UserDefaults.standard.data(forKey: bookmarkKey(prefs)) else { return .notGranted }
+            var stale = false
+            guard let url = try? URL(resolvingBookmarkData: data, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale),
+                  url.standardizedFileURL.path == prefs.containerURL.standardizedFileURL.path,
+                  url.startAccessingSecurityScopedResource() else {
+                Log.write("Access: the saved access to \(prefs.appID) no longer resolves")
+                return .lost
+            }
+            scoped[prefs.appID] = url
+            if stale, let fresh = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) {
+                UserDefaults.standard.set(fresh, forKey: bookmarkKey(prefs))
+                Log.write("Access: refreshed a stale bookmark for \(prefs.appID)")
+            }
+        }
+        guard prefs.canOpenFile() else {
+            Log.write("Access: can't open \(prefs.plistURL.lastPathComponent)")
+            scoped[prefs.appID]?.stopAccessingSecurityScopedResource()
+            scoped[prefs.appID] = nil
             return .lost
         }
         return .granted
     }
 
-    /// Group containers are protected: opening the file fails with EPERM
-    /// without the user's grant, even for a non-sandboxed app.
-    private static func canOpenFile() -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: plistURL) else { return false }
-        try? handle.close()
-        return true
-    }
-
-    /// Shows an open panel on the plist. Returns the new access state.
+    /// One open panel on ~/Library/Group Containers with everything greyed
+    /// out but the folders still missing; the user ⌘-clicks both (NOTES
+    /// §22). Returns the new access state.
     static func requestAccess() -> Access {
+        let missing = containers.filter { access(to: $0) != .granted }
+        guard !missing.isEmpty else { return .granted }
+        let names = missing.map(\.appID)
         let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.propertyList]
-        panel.directoryURL = plistURL.deletingLastPathComponent()
-        panel.message = String(localized: "Select “\(plistURL.lastPathComponent)” and click Grant Access. It holds the “Allow in the Menu Bar” switches.")
+        let filter = OnlyFolders(missing.map(\.containerURL))
+        panel.delegate = filter
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = missing[0].containerURL.deletingLastPathComponent()
+        panel.message = names.count == 2
+            ? String(localized: "Hold ⌘ and select “\(names[0])” and “\(names[1])”, then click Grant Access.")
+            : String(localized: "Select “\(names[0])”, then click Grant Access.")
         panel.prompt = String(localized: "Grant Access")
         NSApp.activate()
-        guard panel.runModal() == .OK, let url = panel.url else { return checkAccess() }
-        guard url.standardizedFileURL.path == plistURL.standardizedFileURL.path else {
-            Log.write("Switches: picked \(url.lastPathComponent), not the Control Center file")
-            let alert = NSAlert()
-            alert.messageText = String(localized: "That’s a different file")
-            alert.informativeText = String(localized: "Select “\(plistURL.lastPathComponent)” in the folder Tacet opens.")
-            alert.runModal()
-            return checkAccess()
+        let response = panel.runModal()
+        withExtendedLifetime(filter) {}
+        guard response == .OK else { return checkAccess() }
+        for url in panel.urls {
+            guard let prefs = missing.first(where: { $0.containerURL.standardizedFileURL.path == url.standardizedFileURL.path }),
+                  let data = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) else {
+                Log.write("Access: couldn't keep \(url.lastPathComponent)")
+                continue
+            }
+            UserDefaults.standard.set(data, forKey: bookmarkKey(prefs))
+            scoped[prefs.appID]?.stopAccessingSecurityScopedResource()
+            scoped[prefs.appID] = nil
         }
-        guard let data = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) else {
-            Log.write("Switches: couldn't create a bookmark")
-            return .lost
-        }
-        UserDefaults.standard.set(data, forKey: bookmarkKey)
-        scoped?.stopAccessingSecurityScopedResource()
-        scoped = nil
         let access = checkAccess()
-        Log.write("Switches: access \(access)")
+        Log.write("Access: \(access) (picked \(panel.urls.count) of \(missing.count) folder(s))")
+        if access == .granted {
+            UserDefaults.standard.removeObject(forKey: "menuBarSettingsBookmark")   // the old file grant
+        } else {
+            let still = containers.filter { Self.access(to: $0) != .granted }.map(\.appID)
+            let first = still.first ?? ""
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Tacet needs both folders")
+            alert.informativeText = still.count == 2
+                ? String(localized: "Hold ⌘ and select “\(still[0])” and “\(still[1])”, then click Grant Access.")
+                : String(localized: "Select “\(first)”, then click Grant Access.")
+            alert.runModal()
+        }
         return access
+    }
+
+    /// Greys out everything but the given folders and the folders on the
+    /// way to them (an open panel can't hide items, only disable them).
+    private final class OnlyFolders: NSObject, NSOpenSavePanelDelegate {
+        let allowed: [String]
+        init(_ urls: [URL]) { allowed = urls.map { $0.standardizedFileURL.path } }
+        func panel(_ sender: Any, shouldEnable url: URL) -> Bool {
+            let path = url.standardizedFileURL.path
+            return allowed.contains { $0 == path || $0.hasPrefix(path + "/") }
+        }
     }
 
     // MARK: Reading
@@ -130,17 +152,7 @@ enum MenuBarSwitches {
         }
     }
 
-    /// Fresh value from cfprefsd (synchronized first so another process's
-    /// change isn't hidden by our cache); the file if that fails.
-    private static func rawValue() -> Data? {
-        if let copyValue, let sync {
-            _ = sync(appID as CFString, containerURL.path as CFString)
-            if let data = copyValue(key as CFString, appID as CFString, containerURL.path as CFString)?.takeRetainedValue() as? Data {
-                return data
-            }
-        }
-        return NSDictionary(contentsOf: plistURL)?[key] as? Data
-    }
+    private static func rawValue() -> Data? { prefs.value(key) as? Data }
 
     private static func decode(_ data: Data?, mutable: Bool) -> NSArray? {
         guard let data else { return nil }
@@ -166,7 +178,7 @@ enum MenuBarSwitches {
     @discardableResult
     static func setAllowed(_ changes: [String: Bool]) -> Bool {
         guard !changes.isEmpty else { return true }
-        guard let setValue, let sync else { Log.write("Switches: CoreFoundation calls missing"); return false }
+        guard isSupported else { Log.write("Switches: CoreFoundation calls missing"); return false }
         guard let list = decode(rawValue(), mutable: true) as? NSMutableArray else {
             Log.write("Switches: can't read before writing"); return false
         }
@@ -182,8 +194,7 @@ enum MenuBarSwitches {
         guard let encoded = try? PropertyListSerialization.data(fromPropertyList: list, format: .binary, options: 0) else {
             Log.write("Switches: can't encode"); return false
         }
-        setValue(key as CFString, encoded as CFData, appID as CFString, containerURL.path as CFString)
-        let synced = sync(appID as CFString, containerURL.path as CFString).boolValue
+        let synced = prefs.set(key, encoded)
         // Read back: the write only counts if cfprefsd now holds it.
         let after = Dictionary((read() ?? []).map { ($0.bundleID, $0.isAllowed) }, uniquingKeysWith: { a, _ in a })
         let stuck = changes.allSatisfy { id, wanted in after[id].map { $0 == wanted } ?? true }

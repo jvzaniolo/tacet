@@ -8,19 +8,21 @@
 "Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar." = "Haz clic en « en la barra de menús para recuperarlas. Si algo falla, vuelve a activarlas en Ajustes del Sistema › Barra de menús.";
 "Quitting turns them back on" = "Al salir, vuelven a activarse";
 "Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it." = "Al salir, Tacet vuelve a activar todas las apps que ocultó. Sal de Tacet antes de eliminarlo.";
+"Tacet arranges the icons" = "Tacet ordena los iconos";
+"Hidden apps sit left of the arrow, always-hidden ones further left. Tacet keeps that order, so there’s nothing to drag." = "Las apps ocultas quedan a la izquierda de la flecha, y las siempre ocultas aún más a la izquierda. Tacet mantiene ese orden, así que no hay nada que arrastrar.";
 "This version of macOS doesn’t offer the switches Tacet needs." = "Esta versión de macOS no ofrece los ajustes que Tacet necesita.";
 "Tacet can change the switches." = "Tacet puede cambiar los ajustes.";
 "Allow Tacet to change the switches" = "Permite que Tacet cambie los ajustes";
+"macOS keeps the switches and the order of the menu bar icons in two settings folders. In the next window, hold ⌘ and select “%@” and “%@” (the only ones you can click), then click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches and the order of the icons." = "macOS guarda los ajustes y el orden de los iconos de la barra de menús en dos carpetas de ajustes. En la siguiente ventana, mantén pulsada ⌘ y selecciona “%@” y “%@” (las únicas en las que puedes hacer clic) y haz clic en Conceder acceso. Tacet solo cambia los ajustes de “Permitir en la barra de menús” y el orden de los iconos.";
 "Tacet lost access to the switches. Apps it hid may still be off: grant access again and Tacet turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar." = "Tacet perdió el acceso a los ajustes. Puede que las apps que ocultó sigan desactivadas: vuelve a concederle acceso y Tacet las activará al salir, o actívalas tú en Ajustes del Sistema › Barra de menús.";
-"macOS keeps the switches in a Control Center settings file. In the next window, select “%@” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it." = "macOS guarda estos ajustes en un archivo del centro de control. En la siguiente ventana, selecciona “%@” (Tacet abre su carpeta) y haz clic en Conceder acceso. Tacet solo cambia los ajustes de “Permitir en la barra de menús” de ese archivo.";
 "Choose Apps to Hide…" = "Elegir apps para ocultar…";
 "Grant Access…" = "Conceder acceso…";
 
 /* File access (open panel and alert) */
-"Select “%@” and click Grant Access. It holds the “Allow in the Menu Bar” switches." = "Selecciona “%@” y haz clic en Conceder acceso. Contiene los ajustes de “Permitir en la barra de menús”.";
 "Grant Access" = "Conceder acceso";
-"That’s a different file" = "Ese es otro archivo";
-"Select “%@” in the folder Tacet opens." = "Selecciona “%@” en la carpeta que abre Tacet.";
+"Hold ⌘ and select “%@” and “%@”, then click Grant Access." = "Mantén pulsada ⌘ y selecciona “%@” y “%@” y haz clic en Conceder acceso.";
+"Select “%@”, then click Grant Access." = "Selecciona “%@” y haz clic en Conceder acceso.";
+"Tacet needs both folders" = "Tacet necesita las dos carpetas";
 
 /* App list */
 "Hide in Tacet" = "Ocultar en Tacet";
@@ -37,6 +39,7 @@
 "Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them." = "Ocultas por macOS, no por Tacet: « no las muestra. Actívalas en Ajustes del Sistema para usarlas.";
 "Open Menu Bar Settings…" = "Abrir ajustes de la barra de menús…";
 "Tacet couldn’t change the menu bar switches." = "Tacet no ha podido cambiar los ajustes de la barra de menús.";
+"Tacet couldn’t arrange the menu bar icons." = "Tacet no pudo ordenar los iconos de la barra de menús.";
 
 /* Open at Login and the keyboard shortcut (macOS's own terms) */
 "Open at Login" = "Abrir al iniciar sesión";
@@ -44,22 +47,18 @@
 "Open Login Items & Extensions…" = "Abrir ítems de inicio y extensiones…";
 "Keyboard Shortcut" = "Atajo de teclado";
 "Show or hide your hidden apps." = "Muestra u oculta las apps ocultas.";
-"Press %@ to also show always-hidden apps." = "Pulsa %@ para mostrar también las siempre ocultas.";
 "%@ is already used by another app." = "Otra app ya usa %@.";
 "Type Shortcut" = "Pulsa el atajo";
-"Type the new shortcut, or press Esc to remove it." = "Pulsa el nuevo atajo o Esc para eliminarlo.";
 "Record Shortcut" = "Grabar atajo";
-"Click, then type the new shortcut. Esc removes it." = "Haz clic y pulsa el nuevo atajo. Esc lo elimina.";
-"Restore Default" = "Restaurar valor por omisión";
+"Clear Shortcut" = "Borrar atajo";
+"Click to record a new shortcut." = "Haz clic para grabar un atajo nuevo.";
+"Show All Items" = "Mostrar todos los ítems";
+"Toggle Always Hidden" = "Alternar siempre ocultas";
 "Use ⌘, ⌥ or ⌃ in the shortcut." = "Usa ⌘, ⌥ o ⌃ en el atajo.";
 "%@ is used by macOS. Choose a different shortcut." = "macOS usa %@. Elige otro atajo.";
 "%@ is already used by another app. Choose a different shortcut." = "Otra app ya usa %@. Elige otro atajo.";
 "Space" = "Espacio";
 
-/* Arrow Position */
-"Arrow Position" = "Posición de la flecha";
-"Play Animation" = "Reproducir animación";
-"Hold ⌘ and drag the » arrow to the right of the apps you hide." = "Mantén pulsada ⌘ y arrastra la flecha » a la derecha de las apps que ocultas.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Mostrar los ítems ocultos de la barra de menús";

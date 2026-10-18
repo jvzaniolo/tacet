@@ -24,12 +24,14 @@ arrow, using macOS's own "Allow in the Menu Bar" switches.
      message about Tacet and click **Open Anyway**, then confirm; or
    - in Terminal: `xattr -dr com.apple.quarantine /Applications/Tacet.app`,
      then open Tacet again.
-4. Tacet asks for one thing: access to the file where macOS keeps the menu
-   bar switches. Click **Grant Access…**, select
-   `group.com.apple.controlcenter.plist` in the folder Tacet opens, and click
-   **Grant Access**.
-5. Turn on the apps you want hidden under **Hide in Tacet**. Hold ⌘ and drag
-   Tacet's arrow to the right of them once.
+4. Tacet asks for one thing: access to the two folders where macOS keeps
+   the menu bar switches and the order of the icons. Click **Grant
+   Access…**, hold ⌘ and select `group.com.apple.controlcenter` and
+   `com.apple.MenuBar` (the only folders you can click), and click **Grant
+   Access**.
+5. Turn on the apps you want hidden under **Hide in Tacet**. Tacet puts them
+   left of its arrow by itself, and keeps that order: an icon dragged out of
+   place goes back.
 
 Click the arrow, or press **⇧⌘<** from any app, to show or hide them. In
 Settings (right-click the arrow › **Settings…**) you can change or remove

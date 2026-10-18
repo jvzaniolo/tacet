@@ -25,8 +25,6 @@ final class SettingsWindowController {
         model.refresh()
         loginItem.refresh()
         hotkey.retryIfTaken()
-        ui.animationStart = .now
-        ui.animationRuns = 2
         if window == nil {
             let view = SettingsRoot(model: model, hotkey: hotkey, loginItem: loginItem, ui: ui)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
@@ -78,10 +76,6 @@ final class SettingsWindowController {
 @Observable
 final class SettingsUIState {
     private static let key = "didOnboard.v3"
-    /// The arrow animation plays twice when the window opens, then waits
-    /// for the play button (one run per click).
-    var animationStart: Date?
-    var animationRuns = 2
     let recorder = ShortcutRecording()
     /// The app row under the pointer, which shows its ⋯ button.
     var hoveredRow: String?
@@ -135,6 +129,8 @@ private struct WelcomeView: View {
                   text: "It hides apps with the “Allow in the Menu Bar” switches in System Settings › Menu Bar. macOS does the hiding, so Notification Center, Focus and the camera and microphone indicators keep working.")
             Point(icon: "eye.slash", title: "Hidden apps show as off in System Settings",
                   text: "Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar.")
+            Point(icon: "arrow.left.arrow.right", title: "Tacet arranges the icons",
+                  text: "Hidden apps sit left of the arrow, always-hidden ones further left. Tacet keeps that order, so there’s nothing to drag.")
             Point(icon: "arrow.uturn.backward", title: "Quitting turns them back on",
                   text: "Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it.")
 
@@ -154,7 +150,7 @@ private struct WelcomeView: View {
                             .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("macOS keeps the switches in a Control Center settings file. In the next window, select “\(MenuBarSwitches.plistURL.lastPathComponent)” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it.")
+                    Text("macOS keeps the switches and the order of the menu bar icons in two settings folders. In the next window, hold ⌘ and select “\(ContainerPrefs.controlCenter.appID)” and “\(ContainerPrefs.menuBar.appID)” (the only ones you can click), then click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches and the order of the icons.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -214,9 +210,6 @@ private struct AppListView: View {
         Form {
             if let error = model.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            }
-            if model.hasHiddenApps {
-                ArrowPlacementSection(ui: ui)
             }
             GeneralSection(hotkey: hotkey, loginItem: loginItem, recorder: ui.recorder)
 
@@ -342,33 +335,21 @@ private struct GeneralSection: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keyboard Shortcut")
-                    Group {
-                        if recorder.isRecording {
-                            Text("Type the new shortcut, or press Esc to remove it.")
-                        } else {
-                            Text("Show or hide your hidden apps.")
-                        }
-                    }
+                    Text("Show or hide your hidden apps.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    // The same keys with ⌥, generated from the shortcut.
-                    if let variant = hotkey.variant, !recorder.isRecording {
-                        Group {
-                            if hotkey.isVariantTaken {
-                                Text("\(variant.display) is already used by another app.")
-                                    .foregroundStyle(.orange)
-                            } else {
-                                Text("Press \(variant.display) to also show always-hidden apps.")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
                 Spacer()
                 ShortcutRecorder(hotkey: hotkey, recorder: recorder)
+            }
+            // The ⌥ variant: read-only, it follows the shortcut.
+            if let variant = hotkey.variant {
+                LabeledContent("Toggle Always Hidden") {
+                    Text(verbatim: variant.display)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 130)
+                }
             }
             if let message {
                 Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -384,14 +365,21 @@ private struct GeneralSection: View {
         case .system(let keys): return "\(keys) is used by macOS. Choose a different shortcut."
         case .taken(let keys): return "\(keys) is already used by another app. Choose a different shortcut."
         case nil:
-            guard let shortcut = hotkey.shortcut, hotkey.isTaken else { return nil }
-            return "\(shortcut.display) is already used by another app. Choose a different shortcut."
+            if let shortcut = hotkey.shortcut, hotkey.isTaken {
+                return "\(shortcut.display) is already used by another app. Choose a different shortcut."
+            }
+            // The ⌥ variant (shown in the arrow's menu) is taken.
+            if let variant = hotkey.variant, hotkey.isVariantTaken {
+                return "\(variant.display) is already used by another app."
+            }
+            return nil
         }
     }
 }
 
-/// Recording a new shortcut: click, then type it; Esc removes it, a click
-/// elsewhere keeps the current one. A local
+/// Recording a new shortcut, as in System Settings › Keyboard Shortcuts:
+/// click the field, then type it; Esc or a click elsewhere keeps the current
+/// one, ⌫ clears it (as does the ✕ in the field). A local
 /// monitor on Tacet's own window, so no permission is involved. The current
 /// shortcut is paused meanwhile, so typing it again reaches the recorder.
 /// (A class, not @State: SwiftUI's @State is a macro the Command Line
@@ -421,7 +409,12 @@ final class ShortcutRecording {
             held = shortcut.modifiers
             return false
         }
-        if event.keyCode == 53 && shortcut.modifiers.isEmpty {   // Esc
+        if event.keyCode == 53 && shortcut.modifiers.isEmpty {   // Esc: cancel
+            problem = nil
+            stop(hotkey)
+            return true
+        }
+        if (event.keyCode == 51 || event.keyCode == 117) && shortcut.modifiers.isEmpty {   // ⌫ ⌦: clear
             problem = nil
             hotkey.remove()
             stop(hotkey)
@@ -443,42 +436,53 @@ final class ShortcutRecording {
     }
 }
 
+/// The shortcut field: the keys, and a ✕ to clear them; while recording,
+/// a prompt and the modifiers held so far, with the accent outline.
 private struct ShortcutRecorder: View {
     let hotkey: Hotkey
     let recorder: ShortcutRecording
 
     var body: some View {
-        HStack(spacing: 4) {
-            if hotkey.shortcut != .standard && !recorder.isRecording {
-                Button {
-                    recorder.problem = hotkey.restoreDefault()
-                } label: {
-                    Image(systemName: "arrow.uturn.backward.circle")
-                }
-                .buttonStyle(.borderless)
-                .help(Text("Restore Default"))
-                .accessibilityLabel(Text("Restore Default"))
-            }
-            Button {
-                if recorder.isRecording { recorder.stop(hotkey) } else { recorder.start(hotkey) }
-            } label: {
+        Button {
+            if recorder.isRecording { recorder.stop(hotkey) } else { recorder.start(hotkey) }
+        } label: {
+            HStack(spacing: 4) {
                 Group {
-                    if !recorder.isRecording {
-                        if let shortcut = hotkey.shortcut {
-                            Text(verbatim: shortcut.display)
+                    if recorder.isRecording {
+                        if recorder.held.isEmpty {
+                            Text("Type Shortcut").foregroundStyle(.secondary)
                         } else {
-                            Text("Record Shortcut")
+                            Text(verbatim: Shortcut.symbols(recorder.held))
                         }
-                    } else if recorder.held.isEmpty {
-                        Text("Type Shortcut")
+                    } else if let shortcut = hotkey.shortcut {
+                        Text(verbatim: shortcut.display)
                     } else {
-                        Text(verbatim: Shortcut.symbols(recorder.held))
+                        Text("Record Shortcut").foregroundStyle(.secondary)
                     }
                 }
-                .frame(minWidth: 90)
+                .frame(maxWidth: .infinity)
+                if hotkey.shortcut != nil && !recorder.isRecording {
+                    Button {
+                        recorder.problem = nil
+                        hotkey.remove()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(Text("Clear Shortcut"))
+                    .accessibilityLabel(Text("Clear Shortcut"))
+                }
             }
-            .help(Text("Click, then type the new shortcut. Esc removes it."))
+            .padding(.horizontal, 8)
+            .frame(width: 130, height: 24)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6)
+                .stroke(recorder.isRecording ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: recorder.isRecording ? 2 : 1))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .help(Text("Click to record a new shortcut."))
         .onDisappear { recorder.stop(hotkey) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in recorder.stop(hotkey) }
     }
@@ -498,190 +502,5 @@ private struct AppRow<Accessory: View>: View {
             accessory()
         }
         .contentShape(Rectangle())   // hover and right-click across the row
-    }
-}
-
-// MARK: Arrow position
-
-/// How to put the arrow right of the hidden apps (NOTES §15). On first launch
-/// macOS puts a new item at the far left, and only a ⌘-drag moves it.
-private struct ArrowPlacementSection: View {
-    let ui: SettingsUIState
-
-    var body: some View {
-        Section {
-            VStack(spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    DragAnimation(start: ui.animationStart, runs: ui.animationRuns) { finished in
-                        // Back to the static final frame, so the timeline stops.
-                        if ui.animationStart == finished { ui.animationStart = nil }
-                    }
-                    Button {
-                        ui.animationRuns = 1
-                        ui.animationStart = .now
-                    } label: {
-                        Image(systemName: "play.circle")
-                            .font(.system(size: 18))
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(ui.animationStart != nil)   // playing
-                    .help(Text("Play Animation"))
-                    .accessibilityLabel(Text("Play Animation"))
-                    .padding(.top, 6)
-                }
-                Text("Hold ⌘ and drag the » arrow to the right of the apps you hide.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
-        } header: {
-            Text("Arrow Position")
-        }
-    }
-}
-
-/// A looping sketch of the ⌘-drag on a mini menu bar: the pointer grabs the
-/// arrow, which sits left of three app icons, and drops it to their right.
-/// Neutral template glyphs and system colors, so it reads as a menu bar in
-/// light and dark mode.
-///
-/// Driven by a 30 fps timeline from the clock, not a phase animator: every
-/// frame is a pure function of the time, so it can't loop on itself (a
-/// PhaseAnimator version spun the main thread at 100 %, NOTES §15).
-struct DragAnimation: View {
-    /// When the current playback began; nil = show the final frame.
-    let start: Date?
-    let runs: Int
-    /// Called with `start` once the last run ends.
-    var onFinished: (Date) -> Void = { _ in }
-
-    private static let slot: CGFloat = 26
-    private static let glyphs = ["circle.hexagongrid.fill", "bolt.horizontal.circle", "cloud.fill"]
-    private static let cycle: Double = 4.0
-    private var appsWidth: CGFloat { CGFloat(Self.glyphs.count) * Self.slot }
-
-    /// The parts of the cycle where something moves; the rest is still, so
-    /// the timeline only redraws at its edges.
-    private static let moving: [ClosedRange<Double>] = [0.8...1.2, 1.6...2.6, 3.0...3.4]
-
-    /// Seconds into the cycle → (arrow progress 0…1, pointer opacity, ⌘ shown).
-    private static func pose(_ t: Double) -> (move: CGFloat, pointer: Double, held: Bool) {
-        func ease(_ x: Double) -> CGFloat { CGFloat(x < 0.5 ? 2 * x * x : 1 - pow(-2 * x + 2, 2) / 2) }
-        switch t {
-        case ..<0.8: return (0, 0, false)                          // rest
-        case ..<1.2: return (0, (t - 0.8) / 0.4, false)            // pointer appears
-        case ..<1.6: return (0, 1, true)                           // ⌘ down, grab
-        case ..<2.6: return (ease((t - 1.6) / 1.0), 1, true)       // drag
-        case ..<3.0: return (1, 1, false)                          // drop
-        case ..<3.4: return (1, 1 - (t - 3.0) / 0.4, false)        // pointer leaves
-        default:     return (1, 0, false)                          // result stays
-        }
-    }
-
-    var body: some View {
-        Group {
-            if let start {
-                TimelineView(MotionSchedule(start: start, runs: runs, cycle: Self.cycle, moving: Self.moving)) { context in
-                    let elapsed = context.date.timeIntervalSince(start)
-                    // After the last run, rest on the final frame.
-                    let t = elapsed >= Double(runs) * Self.cycle ? Self.cycle : elapsed.truncatingRemainder(dividingBy: Self.cycle)
-                    let p = Self.pose(t)
-                    bar(move: p.move, pointer: p.pointer, held: p.held)
-                }
-            } else {
-                let p = Self.pose(Self.cycle)
-                bar(move: p.move, pointer: p.pointer, held: p.held)
-            }
-        }
-        // A TimelineView keeps waking up even after its schedule ends, so
-        // swap it out for the static frame when playback is over.
-        .task(id: start) {
-            guard let start else { return }
-            let end = start.addingTimeInterval(Double(runs) * Self.cycle + 0.1)
-            try? await Task.sleep(for: .seconds(max(0, end.timeIntervalSinceNow)))
-            if !Task.isCancelled { onFinished(start) }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Hold ⌘ and drag the » arrow to the right of the apps you hide."))
-    }
-
-    private func bar(move: CGFloat, pointer: Double, held: Bool) -> some View {
-        HStack(spacing: 16) {
-            ZStack(alignment: .leading) {
-                // Each icon steps left as the arrow passes it, like the bar
-                // making room during a real drag.
-                let arrowSlots = move * CGFloat(Self.glyphs.count)
-                ForEach(Array(Self.glyphs.enumerated()), id: \.offset) { i, name in
-                    let passed = min(max(arrowSlots - CGFloat(i), 0), 1)
-                    Image(systemName: name)
-                        .frame(width: Self.slot, height: 22)
-                        .offset(x: Self.slot * (CGFloat(i) + 1 - passed))
-                }
-                // The dragged arrow floats above them.
-                Image(systemName: "chevron.forward.2")
-                    .fontWeight(.semibold)
-                    .frame(width: Self.slot, height: 22)
-                    .background(Color(nsColor: .windowBackgroundColor).opacity(held ? 0.9 : 0), in: RoundedRectangle(cornerRadius: 4))
-                    .shadow(color: .black.opacity(held ? 0.25 : 0), radius: 2, y: 1)
-                    .offset(x: appsWidth * move)
-            }
-            .frame(width: appsWidth + Self.slot, height: 22, alignment: .leading)
-            .overlay(alignment: .topLeading) {
-                // The pointer, with ⌘ held while it drags. An overlay, so it
-                // never changes the bar's layout.
-                HStack(alignment: .top, spacing: 2) {
-                    Image(systemName: "cursorarrow")
-                        .font(.system(size: 15))
-                        .shadow(color: .black.opacity(0.3), radius: 1)
-                    Text("⌘")
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 3)
-                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 3))
-                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.6), lineWidth: 0.5))
-                        .opacity(held ? 1 : 0)
-                }
-                .offset(x: appsWidth * move + 12, y: 12)
-                .opacity(pointer)
-            }
-            Image(systemName: "wifi")
-            Image(systemName: "battery.75percent")
-            Text(verbatim: "9:41")
-        }
-        .font(.system(size: 13))
-        .padding(.horizontal, 14)
-        .frame(height: 30)
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-        .padding(.bottom, 14)   // room for the pointer below the bar
-    }
-}
-
-/// 30 fps inside the moving spans of `runs` cycles from `start`, one frame at
-/// each still span's start, then a last frame and nothing more. Keeps the
-/// animation's CPU near zero while it rests and at zero once it's done.
-private struct MotionSchedule: TimelineSchedule {
-    let start: Date
-    let runs: Int
-    let cycle: Double
-    let moving: [ClosedRange<Double>]
-
-    func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
-        let fps = mode == .lowFrequency ? 1.0 : 30.0
-        var offsets: [Double] = []
-        for run in 0..<max(runs, 0) {
-            let base = Double(run) * cycle
-            offsets.append(base)
-            for span in moving {
-                var t = span.lowerBound
-                while t < span.upperBound { offsets.append(base + t); t += 1 / fps }
-                offsets.append(base + span.upperBound)
-            }
-        }
-        offsets.append(Double(max(runs, 0)) * cycle)
-        var dates = offsets.map { start.addingTimeInterval($0) }.filter { $0 >= startDate }.makeIterator()
-        return AnyIterator { dates.next() }
     }
 }

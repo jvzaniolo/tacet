@@ -8,19 +8,21 @@
 "Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar." = "Click « in the menu bar to bring them back. If anything ever goes wrong, turn them back on in System Settings › Menu Bar.";
 "Quitting turns them back on" = "Quitting turns them back on";
 "Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it." = "Quitting Tacet turns every app it hid back on. Quit Tacet before you delete it.";
+"Tacet arranges the icons" = "Tacet arranges the icons";
+"Hidden apps sit left of the arrow, always-hidden ones further left. Tacet keeps that order, so there’s nothing to drag." = "Hidden apps sit left of the arrow, always-hidden ones further left. Tacet keeps that order, so there’s nothing to drag.";
 "This version of macOS doesn’t offer the switches Tacet needs." = "This version of macOS doesn’t offer the switches Tacet needs.";
 "Tacet can change the switches." = "Tacet can change the switches.";
 "Allow Tacet to change the switches" = "Allow Tacet to change the switches";
+"macOS keeps the switches and the order of the menu bar icons in two settings folders. In the next window, hold ⌘ and select “%@” and “%@” (the only ones you can click), then click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches and the order of the icons." = "macOS keeps the switches and the order of the menu bar icons in two settings folders. In the next window, hold ⌘ and select “%@” and “%@” (the only ones you can click), then click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches and the order of the icons.";
 "Tacet lost access to the switches. Apps it hid may still be off: grant access again and Tacet turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar." = "Tacet lost access to the switches. Apps it hid may still be off: grant access again and Tacet turns them back on when you quit it, or turn them on yourself in System Settings › Menu Bar.";
-"macOS keeps the switches in a Control Center settings file. In the next window, select “%@” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it." = "macOS keeps the switches in a Control Center settings file. In the next window, select “%@” (Tacet opens its folder) and click Grant Access. Tacet changes only the “Allow in the Menu Bar” switches in it.";
 "Choose Apps to Hide…" = "Choose Apps to Hide…";
 "Grant Access…" = "Grant Access…";
 
 /* File access (open panel and alert) */
-"Select “%@” and click Grant Access. It holds the “Allow in the Menu Bar” switches." = "Select “%@” and click Grant Access. It holds the “Allow in the Menu Bar” switches.";
 "Grant Access" = "Grant Access";
-"That’s a different file" = "That’s a different file";
-"Select “%@” in the folder Tacet opens." = "Select “%@” in the folder Tacet opens.";
+"Hold ⌘ and select “%@” and “%@”, then click Grant Access." = "Hold ⌘ and select “%@” and “%@”, then click Grant Access.";
+"Select “%@”, then click Grant Access." = "Select “%@”, then click Grant Access.";
+"Tacet needs both folders" = "Tacet needs both folders";
 
 /* App list */
 "Hide in Tacet" = "Hide in Tacet";
@@ -37,6 +39,7 @@
 "Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them." = "Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them.";
 "Open Menu Bar Settings…" = "Open Menu Bar Settings…";
 "Tacet couldn’t change the menu bar switches." = "Tacet couldn’t change the menu bar switches.";
+"Tacet couldn’t arrange the menu bar icons." = "Tacet couldn’t arrange the menu bar icons.";
 
 /* Open at Login and the keyboard shortcut (macOS's own terms) */
 "Open at Login" = "Open at Login";
@@ -44,22 +47,18 @@
 "Open Login Items & Extensions…" = "Open Login Items & Extensions…";
 "Keyboard Shortcut" = "Keyboard Shortcut";
 "Show or hide your hidden apps." = "Show or hide your hidden apps.";
-"Press %@ to also show always-hidden apps." = "Press %@ to also show always-hidden apps.";
 "%@ is already used by another app." = "%@ is already used by another app.";
 "Type Shortcut" = "Type Shortcut";
-"Type the new shortcut, or press Esc to remove it." = "Type the new shortcut, or press Esc to remove it.";
 "Record Shortcut" = "Record Shortcut";
-"Click, then type the new shortcut. Esc removes it." = "Click, then type the new shortcut. Esc removes it.";
-"Restore Default" = "Restore Default";
+"Clear Shortcut" = "Clear Shortcut";
+"Click to record a new shortcut." = "Click to record a new shortcut.";
+"Show All Items" = "Show All Items";
+"Toggle Always Hidden" = "Toggle Always Hidden";
 "Use ⌘, ⌥ or ⌃ in the shortcut." = "Use ⌘, ⌥ or ⌃ in the shortcut.";
 "%@ is used by macOS. Choose a different shortcut." = "%@ is used by macOS. Choose a different shortcut.";
 "%@ is already used by another app. Choose a different shortcut." = "%@ is already used by another app. Choose a different shortcut.";
 "Space" = "Space";
 
-/* Arrow Position */
-"Arrow Position" = "Arrow Position";
-"Play Animation" = "Play Animation";
-"Hold ⌘ and drag the » arrow to the right of the apps you hide." = "Hold ⌘ and drag the » arrow to the right of the apps you hide.";
 
 /* Status item and menu (arrow labels are Apple's own for its overflow arrow) */
 "Show Hidden Menu Bar Items" = "Show Hidden Menu Bar Items";

@@ -1359,3 +1359,51 @@ So on macOS 27 the click reaches a third-party status item without its
 modifiers (presumably relayed by MenuBarAgent); ⌥-clicks aren't eaten or
 turned into right-clicks. Tacet reads `NSEvent.modifierFlags` (no
 permission needed) for ⌥ (show the always-hidden apps too) and ⌃ (menu).
+
+## 22. Tacet keeps the icon order itself (2026-10-18)
+
+Research and spikes: `research/REPORT-autoplace.md` (outside the repo).
+What shipped:
+
+- **Mechanism:** Tacet writes `TrailingItemPreferredPositions` in the
+  `com.apple.MenuBar` group container (the table MenuBarAgent writes on a
+  ⌘-drag) with the same container-aware CFPreferences calls as the switches
+  (`ContainerPrefs`). Larger weight = further left; only the order of the
+  items on screen matters, stale keys are inert. A weight written while an
+  item is off is where it comes back; one written while it's on screen
+  slides it live (~1 s), and one written before the item exists is where it
+  first appears.
+- **Order:** `[always hidden] [hidden] « [visible]`. First run: the arrow's
+  weight is the highest visible weight + 1 (left of everything, Apple's
+  modules included), saved in `order.arrowWeight`; a different arrow weight
+  in the table later means a drag, and it's put back. On this Mac stale keys
+  from old experiments went up to 2233, so the arrow got 2234: harmless.
+- **Keys of an app:** `status:<owner>::…` where the owner is the bundle ID
+  or an executable name. Matching by `urlForApplication`'s executable isn't
+  enough: Riot Client ships a nested `Riot Client.app` with the same bundle
+  ID, found first, while its status item belongs to `RiotClientServices`.
+  Tacet matches every executable `urlsForApplications(withBundleIdentifier:)`
+  returns, plus the running ones.
+- **Moves without a slide:** an app changing group is switched off, its
+  weight written 0.3 s later, then switched on 0.3 s after that if it
+  should show.
+- **Enforcement:** on every conceal (hidden groups re-laid out unseen, each
+  keeping its order), on reveal and after the table's folder changes (a
+  DispatchSource on `…/com.apple.MenuBar/Library/Preferences`, debounced
+  1.5 s, postponed while a mouse button is down): visible icons left of the
+  arrow go right next to it. At launch only the arrow and the visible side,
+  since Quit had turned the hidden apps on.
+- **Writes:** merged into a fresh read, the whole dictionary written, read
+  back; one retry. Logged as "Order: wrote N position(s) (synced, verified)";
+  a failure shows "Tacet couldn't arrange the menu bar icons." in Settings.
+- **Backup:** before the first write, the table is copied to
+  `~/Library/Application Support/Tacet/menubar-order-backup.plist`
+  (`--restore-order-backup` writes it back; `--reset-order` forgets the
+  arrow, as on a first install).
+- **Grant:** one open panel on `~/Library/Group Containers`, directories,
+  multiple selection, a delegate that disables everything but the missing
+  folders; a security-scoped bookmark per folder (`access.<appID>`). Granted
+  here in one go: "Access: granted (picked 2 of 2 folder(s))". No extra
+  system prompt.
+- **Quit** restores the switches, not the old order: the apps come back
+  where they were hidden, left of the arrow, which does no harm.
