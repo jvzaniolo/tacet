@@ -101,6 +101,7 @@ Releases so far:
 | 1 (0.1.0) | 2026-10-16 | 2026-12-15 | `f8e99a6b…df132` (GitHub release, now retired) |
 | 2 (0.1.0) | 2026-10-16 | 2026-12-15 | `dd7e3b4996e856006dd9f1b45a615aa9ec3400c2a88e4b0051bdd8f0d0bcb313` (build 202610162022; replaces build 202610162010, `9e7ac46e…6aadc`, whose "Visit Website" pointed at gettacet.com, a domain that isn't ours) |
 | 2 (0.1.0), zip | 2026-10-17 | 2026-12-15 | `2186bfe0cb5fc9648c0beceff31868edd06cf323845e4947893fae1cc6b6442e` (same app as the beta 2 DMG, repacked with `FROM_DMG`; replaces the DMG on Gumroad) |
+| 3 (0.1.0) | 2026-10-18 | 2026-12-17 | `a3621dba7a619e771569bc8eebc5832021cca6152b5462848afdd38c2bfed495` (zip, build 202610181618: Open at Login, ⇧⌘< shortcut, auto-hide, days left in the menu) |
 
 To test the "beta has ended" window: `BETA=1 EXPIRES_DAYS=0 scripts/install.sh`.
 
