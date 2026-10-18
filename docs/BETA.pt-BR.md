@@ -38,6 +38,11 @@ mudar ou remover esse atalho e ativar **Abrir no Início da Sessão**. Os apps
 mostrados se ocultam sozinhos alguns segundos depois que o ponteiro sai da
 Barra de Menus (nunca com um menu aberto).
 
+Apps que você quase não usa podem ficar ocultos até nessa hora: nos Ajustes,
+passe o mouse sobre o app e clique em ⋯ (ou clique nele com o botão direito)
+› **Manter Sempre Oculto**. Clique na seta com ⌥, ou pressione **⌥⇧⌘<**,
+para ver esses também; **Voltar para a Lista** devolve um deles à lista.
+
 Os apps ocultos aparecem "desativados" em Ajustes do Sistema › Barra de
 Menus. Encerrar o Tacet reativa todos; encerre o Tacet antes de apagá-lo.
 

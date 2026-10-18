@@ -1342,3 +1342,20 @@ No Apple account, no cost. Details for testers and the release steps:
   must be compiled by Xcode's `actool`. The `.icns` (full bleed) is the
   shipped format; macOS adds its own mask and glass edge.
 - Site exports in `Icon/export/` (`Icon/export-site.sh`).
+
+## 21. Modifier keys on a status item click (2026-10-18)
+
+Clicking Tacet's arrow with ⌥ held: the action runs (on mouse-down, as set
+up), but `NSApp.currentEvent.modifierFlags` is **0x0**, while
+`NSEvent.modifierFlags` (the keys held right now) is 0x80000 (⌥). Logged on
+27.0.1 with a plain click and a ⌥-click:
+
+```
+Arrow: event type 1, event flags 0x0, keyboard flags 0x0
+Arrow: event type 1, event flags 0x0, keyboard flags 0x80000
+```
+
+So on macOS 27 the click reaches a third-party status item without its
+modifiers (presumably relayed by MenuBarAgent); ⌥-clicks aren't eaten or
+turned into right-clicks. Tacet reads `NSEvent.modifierFlags` (no
+permission needed) for ⌥ (show the always-hidden apps too) and ⌃ (menu).

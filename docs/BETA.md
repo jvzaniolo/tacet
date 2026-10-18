@@ -37,6 +37,11 @@ that shortcut and turn on **Open at Login**. Shown apps hide again by
 themselves a few seconds after the pointer leaves the menu bar (never while a
 menu is open).
 
+Apps you rarely need can stay hidden even then: in Settings, hover an app
+and click ⋯ (or right-click it) › **Keep Always Hidden**. Option-click (⌥)
+the arrow, or press **⌥⇧⌘<**, to show those too; **Move Back** returns one
+to the list.
+
 Hidden apps show as "off" in System Settings › Menu Bar. Quitting Tacet turns
 them all back on; quit Tacet before deleting it.
 

@@ -83,6 +83,8 @@ final class SettingsUIState {
     var animationStart: Date?
     var animationRuns = 2
     let recorder = ShortcutRecording()
+    /// The app row under the pointer, which shows its ⋯ button.
+    var hoveredRow: String?
 
     var didOnboard = UserDefaults.standard.bool(forKey: key) {
         didSet { UserDefaults.standard.set(didOnboard, forKey: Self.key) }
@@ -204,7 +206,8 @@ private struct AppListView: View {
     let loginItem: LoginItem
     let ui: SettingsUIState
 
-    private var managed: [ShelfModel.Row] { model.rows.filter { $0.status != .offInSystemSettings } }
+    private var managed: [ShelfModel.Row] { model.rows.filter { $0.status == .visible || $0.status == .hidden } }
+    private var alwaysHidden: [ShelfModel.Row] { model.rows.filter { $0.status == .alwaysHidden } }
     private var offInSettings: [ShelfModel.Row] { model.rows.filter { $0.status == .offInSystemSettings } }
 
     var body: some View {
@@ -223,6 +226,18 @@ private struct AppListView: View {
                 }
                 ForEach(managed) { row in
                     AppRow(row: row) {
+                        // ⋯ on hover; the same menu on right-click.
+                        Menu {
+                            keepAlwaysHidden(row)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .opacity(ui.hoveredRow == row.id ? 1 : 0)
+                        .help(Text("More"))
+                        .accessibilityLabel(Text("More"))
                         Toggle("Hide \(row.name) in Tacet", isOn: Binding(
                             get: { row.status == .hidden },
                             set: { model.setHidden(row.bundleID, $0) }
@@ -230,6 +245,10 @@ private struct AppListView: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                     }
+                    .onHover { inside in
+                        if inside { ui.hoveredRow = row.id } else if ui.hoveredRow == row.id { ui.hoveredRow = nil }
+                    }
+                    .contextMenu { keepAlwaysHidden(row) }
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
@@ -239,6 +258,28 @@ private struct AppListView: View {
                         .fontWeight(.regular)
                         .foregroundStyle(.secondary)
                         .textCase(nil)
+                }
+            }
+
+            // Shown even when empty (header only), so the place is known.
+            Section {
+                ForEach(alwaysHidden) { row in
+                    AppRow(row: row) {
+                        Button("Move Back") { model.setAlwaysHidden(row.bundleID, false) }
+                            .controlSize(.small)
+                    }
+                }
+            } header: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Always Hidden")
+                    // The arrow as the bar draws it while closed (ShelfController).
+                    let arrow = Image(systemName: "chevron.backward.2")
+                    Text("Hold ⌥ and click \(arrow) to see these items.")
+                        .font(.callout)
+                        .fontWeight(.regular)
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -260,16 +301,13 @@ private struct AppListView: View {
                     }
                 }
             }
-
-            Section {
-                Text("Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
         .formStyle(.grouped)
         .frame(minHeight: 560)
+    }
+
+    private func keepAlwaysHidden(_ row: ShelfModel.Row) -> some View {
+        Button("Keep Always Hidden") { model.setAlwaysHidden(row.bundleID, true) }
     }
 }
 
@@ -308,12 +346,26 @@ private struct GeneralSection: View {
                         if recorder.isRecording {
                             Text("Type the new shortcut, or press Esc to remove it.")
                         } else {
-                            Text("Shows and hides the hidden apps from any app, like clicking the arrow.")
+                            Text("Show or hide your hidden apps.")
                         }
                     }
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    // The same keys with ⌥, generated from the shortcut.
+                    if let variant = hotkey.variant, !recorder.isRecording {
+                        Group {
+                            if hotkey.isVariantTaken {
+                                Text("\(variant.display) is already used by another app.")
+                                    .foregroundStyle(.orange)
+                            } else {
+                                Text("Press \(variant.display) to also show always-hidden apps.")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer()
                 ShortcutRecorder(hotkey: hotkey, recorder: recorder)
@@ -445,6 +497,7 @@ private struct AppRow<Accessory: View>: View {
             Spacer()
             accessory()
         }
+        .contentShape(Rectangle())   // hover and right-click across the row
     }
 }
 

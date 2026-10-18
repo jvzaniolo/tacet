@@ -3,9 +3,11 @@ import Observation
 
 /// What Tacet hides and what it has switched off (NOTES §13).
 ///
-/// Three states per app in `trackedApplications`:
+/// Four states per app in `trackedApplications`:
 /// - Visible: not in `hidden`, switch on. Tacet leaves it alone.
 /// - Hidden: in `hidden`. Switch off while concealed, on while revealed.
+/// - Always hidden: in `alwaysHidden`. Switch off even while revealed; on
+///   only while everything is revealed (⌥-click on the arrow).
 /// - Off in System Settings: not in `hidden`, switch off. The user turned it
 ///   off in macOS; Tacet never turns it on.
 ///
@@ -15,7 +17,7 @@ import Observation
 @MainActor
 @Observable
 final class ShelfModel {
-    enum Status { case visible, hidden, offInSystemSettings }
+    enum Status { case visible, hidden, alwaysHidden, offInSystemSettings }
 
     struct Row: Identifiable, Equatable {
         let bundleID: String
@@ -33,27 +35,47 @@ final class ShelfModel {
     private(set) var access: MenuBarSwitches.Access = .notGranted
     private(set) var rows: [Row] = []
     private(set) var revealed = false
+    /// Revealed with ⌥: the always-hidden apps are shown too.
+    private(set) var revealedAll = false
     /// Beta build past its expiry: hide nothing, restore what was hidden.
     private(set) var expired = false
     private(set) var lastError: String?
 
     private static let ownID = Bundle.main.bundleIdentifier ?? "app.gettacet.Tacet"
     private static let hiddenKey = "hiddenApps.v3"
+    private static let alwaysHiddenKey = "alwaysHiddenApps.v1"
 
     /// The user's choice: apps hidden behind «.
     private(set) var hidden: Set<String> {
         didSet { UserDefaults.standard.set(Array(hidden).sorted(), forKey: Self.hiddenKey) }
+    }
+    /// Kept apart from `hidden`: an app is in one set or the other.
+    private(set) var alwaysHidden: Set<String> {
+        didSet { UserDefaults.standard.set(Array(alwaysHidden).sorted(), forKey: Self.alwaysHiddenKey) }
     }
     private(set) var heldOff: Set<String>
     private var switches: [String: Bool] = [:]
     @ObservationIgnored private var appInfo: [String: (name: String, icon: NSImage)] = [:]
 
     init() {
-        hidden = Set(UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? [])
+        let hidden = Set(UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? [])
+        self.hidden = hidden
+        alwaysHidden = Set(UserDefaults.standard.stringArray(forKey: Self.alwaysHiddenKey) ?? []).subtracting(hidden)
         heldOff = Journal.load()
     }
 
     var hasHiddenApps: Bool { !hidden.isEmpty }
+    var hasAlwaysHiddenApps: Bool { !alwaysHidden.isEmpty }
+    /// The apps on screen because of a reveal (for telling their menus apart).
+    var shownApps: Set<String> {
+        guard revealed else { return [] }
+        return revealedAll ? hidden.union(alwaysHidden) : hidden
+    }
+    /// What Tacet keeps switched off in the current state.
+    private var wantedOff: Set<String> {
+        if !revealed { return hidden.union(alwaysHidden) }
+        return revealedAll ? [] : alwaysHidden
+    }
 
     // MARK: Launch and quit
 
@@ -66,9 +88,9 @@ final class ShelfModel {
             }
             return
         }
-        Log.write("Launch: \(current.count) tracked app(s), \(hidden.count) hidden, \(heldOff.count) held off")
+        Log.write("Launch: \(current.count) tracked app(s), \(hidden.count) hidden, \(alwaysHidden.count) always hidden, \(heldOff.count) held off")
         Log.debug("Launch: switches " + current.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value ? "on" : "off")" }.joined(separator: ", ")
-                  + "; hidden \(hidden.sorted()); held off \(heldOff.sorted())")
+                  + "; hidden \(hidden.sorted()); always hidden \(alwaysHidden.sorted()); held off \(heldOff.sorted())")
         if !heldOff.isEmpty {
             // The last run didn't restore on quit (crash, kill -9, power loss).
             // Switches still off are adopted: they're concealed, which is
@@ -76,7 +98,7 @@ final class ShelfModel {
             // from the journal; their apps stay hidden and conceal() hides
             // them again. Anything held off but no longer hidden is restored.
             let stillOff = heldOff.filter { current[$0] == false }
-            let orphaned = stillOff.subtracting(hidden)
+            let orphaned = stillOff.subtracting(hidden).subtracting(alwaysHidden)
             Log.write("Launch: recovering from the last run; \(heldOff.count) held off, \(stillOff.count) still off")
             Log.debug("Launch: held off \(heldOff.sorted()), still off \(stillOff.sorted())")
             heldOff = stillOff
@@ -148,13 +170,14 @@ final class ShelfModel {
         for id in heldOff where current[id] != false {
             heldOff.remove(id)
             changed = true
-            if current[id] == true, hidden.remove(id) != nil {
+            if current[id] == true, hidden.remove(id) != nil || alwaysHidden.remove(id) != nil {
                 Log.write("Reconcile: an app was turned on in System Settings; now Visible")
                 Log.debug("Reconcile: \(id) turned on in System Settings")
             }
         }
-        for id in hidden where current[id] == false && !heldOff.contains(id) {
+        for id in hidden.union(alwaysHidden) where current[id] == false && !heldOff.contains(id) {
             hidden.remove(id)
+            alwaysHidden.remove(id)
             Log.write("Reconcile: an app was turned off in System Settings; Tacet won't turn it on")
             Log.debug("Reconcile: \(id) turned off in System Settings")
         }
@@ -167,7 +190,9 @@ final class ShelfModel {
     private func rebuildRows() {
         let new = switches.keys.map { id in
             let info = info(for: id)
-            let status: Status = hidden.contains(id) ? .hidden : (switches[id] == true ? .visible : .offInSystemSettings)
+            let status: Status = hidden.contains(id) ? .hidden
+                : alwaysHidden.contains(id) ? .alwaysHidden
+                : (switches[id] == true ? .visible : .offInSystemSettings)
             return Row(bundleID: id, name: info.name, icon: info.icon, status: status)
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -188,31 +213,51 @@ final class ShelfModel {
     /// From the Settings list. Takes effect at once while concealed.
     func setHidden(_ id: String, _ hide: Bool) {
         guard id != Self.ownID else { return }
-        if hide { hidden.insert(id) } else { hidden.remove(id) }
+        if hide {
+            alwaysHidden.remove(id)
+            hidden.insert(id)
+        } else {
+            hidden.remove(id)
+        }
         apply()
     }
 
-    func conceal() { revealed = false; apply() }
+    /// Keep Always Hidden moves an app out of the list; Move Back returns
+    /// it as hidden by Tacet (switch on).
+    func setAlwaysHidden(_ id: String, _ always: Bool) {
+        guard id != Self.ownID else { return }
+        if always {
+            hidden.remove(id)
+            alwaysHidden.insert(id)
+        } else {
+            alwaysHidden.remove(id)
+            hidden.insert(id)
+        }
+        apply()
+    }
+
+    func conceal() { revealed = false; revealedAll = false; apply() }
 
     /// The beta has ended: turn every switch Tacet changed back on, for good.
     func expire() {
         expired = true
         revealed = false
+        revealedAll = false
         Log.write("Beta expired: restoring and no longer hiding")
         restoreAll()
     }
-    func reveal() { revealed = true; apply() }
+    func reveal(all: Bool = false) { revealed = true; revealedAll = all; apply() }
 
-    /// Brings the switches in line with `hidden` and `revealed`, in one write.
+    /// Brings the switches in line with the hidden sets and the reveal
+    /// state, in one write.
     private func apply() {
         guard !expired else { restoreAll(); return }
         guard access == .granted, let current = readSwitches() else { rebuildRows(); return }
         reconcile(current)
+        let off = wantedOff
         var changes: [String: Bool] = [:]
-        if !revealed {
-            for id in hidden where current[id] == true { changes[id] = false }
-        }
-        for id in heldOff where revealed || !hidden.contains(id) { changes[id] = true }
+        for id in off where current[id] == true { changes[id] = false }
+        for id in heldOff where !off.contains(id) { changes[id] = true }
         write(changes)
     }
 

@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         shelf.hotkey = hotkey
         shelf.start()
-        hotkey.onPress = { [weak self] in self?.shelf.toggle() }
+        hotkey.onPress = { [weak self] all in self?.shelf.toggle(all: all) }
         hotkey.start()
         loginItem.refresh()
         if model.expired {

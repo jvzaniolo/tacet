@@ -59,10 +59,11 @@ final class ShelfController {
         render()
     }
 
-    func reveal() {
-        let pids = hiddenPIDs()
+    /// `all`: ⌥-click, the always-hidden apps are shown too.
+    func reveal(all: Bool = false) {
+        let pids = pids(for: all ? model.hidden.union(model.alwaysHidden) : model.hidden)
         revealBaseline = Set(MenuTracker.allWindows().filter { pids.contains($0.pid) }.map(\.id))
-        model.reveal()
+        model.reveal(all: all)
         render()
         installMonitors()
         startAutoHide()
@@ -90,12 +91,17 @@ final class ShelfController {
 
     @objc private func arrowClicked() {
         clearHighlight()
+        // On macOS 27 the click reaches the status item without its modifier
+        // flags (always 0); NSEvent.modifierFlags, the keys held right now,
+        // has them and needs no permission (NOTES §21).
+        let modifiers = NSEvent.modifierFlags.union(NSApp.currentEvent?.modifierFlags ?? [])
         if let event = NSApp.currentEvent {
+            Log.debug("Arrow: event type \(event.type.rawValue), event flags 0x\(String(event.modifierFlags.rawValue, radix: 16)), keys held 0x\(String(NSEvent.modifierFlags.rawValue, radix: 16))")
             if event.type == .rightMouseUp {
                 showMenu()
                 return
             }
-            if event.modifierFlags.contains(.control) {
+            if modifiers.contains(.control) {
                 // Control-click arrives on mouse-down: open the menu once the
                 // button's tracking has ended (same reason as above).
                 RunLoop.main.perform(inModes: [.default]) { [weak self] in
@@ -104,21 +110,27 @@ final class ShelfController {
                 return
             }
         }
-        toggle()
+        toggle(all: modifiers.contains(.option))
     }
 
-    /// A click on the arrow, or the global shortcut.
-    func toggle() {
+    /// A click on the arrow, or the global shortcut. `all` (⌥-click) also
+    /// shows the always-hidden apps; ⌥-click while only the hidden ones are
+    /// shown adds them.
+    func toggle(all: Bool = false) {
         if model.expired {
             showExpired?()
             return
         }
         // Nothing to show yet (no access, or no hidden apps): open Settings.
-        guard model.access == .granted, model.hasHiddenApps || model.revealed else {
+        let hasApps = model.hasHiddenApps || (all && model.hasAlwaysHiddenApps)
+        guard model.access == .granted, hasApps || model.revealed else {
             openSettings?()
             return
         }
-        if model.revealed { conceal() } else { reveal() }
+        if model.revealed && !(all && !model.revealedAll) { conceal() } else {
+            if all { Log.write("Reveal: hidden and always-hidden apps (⌥)") }
+            reveal(all: all)
+        }
     }
 
     private func showMenu() {
@@ -196,10 +208,12 @@ final class ShelfController {
         }
     }
 
-    private func hiddenPIDs() -> Set<pid_t> {
-        let hidden = model.hidden
-        return Set(NSWorkspace.shared.runningApplications
-            .filter { $0.bundleIdentifier.map(hidden.contains) ?? false }
+    /// The apps on screen because of the reveal.
+    private func hiddenPIDs() -> Set<pid_t> { pids(for: model.shownApps) }
+
+    private func pids(for ids: Set<String>) -> Set<pid_t> {
+        Set(NSWorkspace.shared.runningApplications
+            .filter { $0.bundleIdentifier.map(ids.contains) ?? false }
             .map(\.processIdentifier))
     }
 

@@ -2,7 +2,10 @@ import AppKit
 import Carbon.HIToolbox
 import Observation
 
-/// The global shortcut: the same as clicking the arrow, from any app.
+/// The global shortcut: the same as clicking the arrow, from any app. The
+/// same keys with ⌥ added (⌥⇧⌘< by default) do what ⌥-click does: the
+/// always-hidden apps too. Not a setting of its own: it follows the
+/// shortcut, and there's none when the shortcut already has ⌥.
 /// ⇧⌘< (Shift-comma on US and ABNT2 keyboards; it looks like the « arrow)
 /// unless the user records another one in Settings. Not ⇧⌘←: a global hot
 /// key would take "select to start of line" from every text field.
@@ -32,24 +35,39 @@ final class Hotkey {
     }()
     /// Set, but another app already has it.
     private(set) var isTaken = false
+    /// The ⌥ variant is taken (the shortcut itself may still work).
+    private(set) var isVariantTaken = false
+    /// The shortcut with ⌥ added; nil if it has ⌥ already, or is removed.
+    var variant: Shortcut? {
+        guard let shortcut, !shortcut.modifiers.contains(.option) else { return nil }
+        return Shortcut(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers.union(.option))
+    }
     var isActive: Bool { shortcut != nil && !isTaken && !isPaused }
     /// While Settings records a new shortcut, so pressing the current one
     /// reaches the recorder.
     private var isPaused = false
 
-    @ObservationIgnored var onPress: (() -> Void)?
+    /// `true` for the ⌥ variant.
+    @ObservationIgnored var onPress: ((Bool) -> Void)?
     @ObservationIgnored private var hotKey: EventHotKeyRef?
+    @ObservationIgnored private var variantHotKey: EventHotKeyRef?
+    private static let mainID: UInt32 = 1
+    private static let variantID: UInt32 = 2
     @ObservationIgnored private var handler: EventHandlerRef?
 
     func start() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let status = InstallEventHandler(GetApplicationEventTarget(), { _, _, userData in
+        let status = InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
             // Carbon delivers hot keys on the main thread.
-            guard let userData else { return OSStatus(eventNotHandledErr) }
+            guard let event, let userData else { return OSStatus(eventNotHandledErr) }
+            var id = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            let all = id.id == Hotkey.variantID
             let hotkey = Unmanaged<Hotkey>.fromOpaque(userData).takeUnretainedValue()
             MainActor.assumeIsolated {
-                Log.write("Shortcut: pressed")
-                hotkey.onPress?()
+                Log.write(all ? "Shortcut: pressed with ⌥" : "Shortcut: pressed")
+                hotkey.onPress?(all)
             }
             return noErr
         }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), &handler)
@@ -59,7 +77,7 @@ final class Hotkey {
 
     /// Tries again if another app had the shortcut (it may have quit).
     func retryIfTaken() {
-        if isTaken { apply() }
+        if isTaken || isVariantTaken { apply() }
     }
 
     func pause() {
@@ -77,15 +95,16 @@ final class Hotkey {
         if !new.hasModifier { return .needsModifier }
         if new.isSystemShortcut { return .system(new.display) }
         unregister()
-        if register(new) != noErr {
-            if let shortcut, !isPaused { _ = register(shortcut) }
+        let status = register(new, id: Self.mainID, into: &hotKey)
+        unregister()
+        if status != noErr {
+            apply()
             return .taken(new.display)
         }
         shortcut = new
-        isTaken = false
         UserDefaults.standard.set(new.defaults, forKey: Self.shortcutKey)
         Log.write("Shortcut: changed")
-        if isPaused { unregister() }
+        apply()
         return nil
     }
 
@@ -93,6 +112,7 @@ final class Hotkey {
         unregister()
         shortcut = nil
         isTaken = false
+        isVariantTaken = false
         UserDefaults.standard.set([String: Any](), forKey: Self.shortcutKey)
         Log.write("Shortcut: removed")
     }
@@ -105,23 +125,34 @@ final class Hotkey {
         unregister()
         guard let shortcut, !isPaused else {
             isTaken = false
+            isVariantTaken = false
             return
         }
-        let status = register(shortcut)
+        let status = register(shortcut, id: Self.mainID, into: &hotKey)
         isTaken = status != noErr
         Log.write(isTaken ? "Shortcut: taken by another app (\(status))" : "Shortcut: registered")
+        // Each on its own: one taken doesn't stop the other.
+        if let variant {
+            let status = register(variant, id: Self.variantID, into: &variantHotKey)
+            isVariantTaken = status != noErr
+            if isVariantTaken { Log.write("Shortcut: ⌥ variant taken by another app (\(status))") }
+        } else {
+            isVariantTaken = false
+        }
     }
 
-    private func register(_ shortcut: Shortcut) -> OSStatus {
-        let id = EventHotKeyID(signature: OSType(0x5461_6374), id: 1)   // 'Tact'
+    private func register(_ shortcut: Shortcut, id: UInt32, into ref: inout EventHotKeyRef?) -> OSStatus {
+        let hotKeyID = EventHotKeyID(signature: OSType(0x5461_6374), id: id)   // 'Tact'
         // Exclusive: fail, rather than share, if another app registered it.
-        return RegisterEventHotKey(shortcut.keyCode, shortcut.carbonModifiers, id, GetApplicationEventTarget(),
-                                   OptionBits(kEventHotKeyExclusive), &hotKey)
+        return RegisterEventHotKey(shortcut.keyCode, shortcut.carbonModifiers, hotKeyID, GetApplicationEventTarget(),
+                                   OptionBits(kEventHotKeyExclusive), &ref)
     }
 
     private func unregister() {
         if let hotKey { UnregisterEventHotKey(hotKey) }
+        if let variantHotKey { UnregisterEventHotKey(variantHotKey) }
         hotKey = nil
+        variantHotKey = nil
     }
 }
 

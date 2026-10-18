@@ -74,18 +74,29 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   turn an app **on** to hide it behind the arrow. Apps appear after their
   first time in the menu bar. Apps turned off in System Settings are listed
   separately, without a switch.
+- **Always Hidden:** hover a row (⋯) or right-click it › **Keep Always
+  Hidden** moves the app to the **Always Hidden** section (shown even when
+  empty). Those stay off when you click the arrow or press the shortcut;
+  ⌥-click the arrow (or press the shortcut with ⌥) to show them together
+  with the hidden ones (closing,
+  the 10 s auto-hide and an outside click hide both again). **Move Back**
+  returns an app to the list, hidden by Tacet. Quit and crash recovery turn
+  them back on like hidden apps (same journal).
 - **Show / hide:** click « to show the hidden apps in their real places (menus
   open under them, as usual). Click », anywhere outside the menu bar, or Esc
   with no menu open (Esc only if Tacet has Accessibility, which it doesn't
   ask for) to hide them again.
 - **Keyboard shortcut:** ⇧⌘< (Shift-comma on US and ABNT2 keyboards) does
-  the same as clicking the arrow, from any app; the right-click menu shows it
-  next to its show/hide item. In Settings, click it and type a new one, or
-  press Esc to remove it (⌘, ⌥ or ⌃ required; macOS's own shortcuts are
-  refused; a click elsewhere keeps the current one). If another app already registered it,
-  Settings says so. Registered with Carbon's `RegisterEventHotKey`, which
-  needs no permission (an event tap or global key monitor would need Input
-  Monitoring or Accessibility).
+  the same as clicking the arrow, from any app; the right-click menu shows
+  it next to its show/hide item. In Settings, click it and type a new one,
+  or press Esc to remove it (⌘, ⌥ or ⌃ required; macOS's own shortcuts are
+  refused; a click elsewhere keeps the current one). If another app
+  already registered it, Settings says so. The same keys with ⌥ added
+  (⌥⇧⌘< by default; none if the shortcut already has ⌥) do what ⌥-click
+  does, with the always-hidden apps too; a second hot key registered and
+  removed with the first, shown as a caption under it. Registered with
+  Carbon's `RegisterEventHotKey`, which needs no permission (an event tap
+  or global key monitor would need Input Monitoring or Accessibility).
 - **Hiding again on their own:** 10 seconds after the pointer leaves the
   menu bar, the shown apps hide again, the same way a click on the arrow
   does (fixed, no setting). The countdown runs only while the pointer is off
@@ -97,8 +108,9 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   opens, since it can be turned off in System Settings › General › Login
   Items & Extensions; while macOS has it off or waits for approval, Settings
   says so and links there.
-- **Three states:** Visible, Hidden (by Tacet), and Off in System Settings
-  (turned off outside Tacet: listed, never turned on by «). Changes made in
+- **Four states:** Visible, Hidden (by Tacet), Always Hidden (by Tacet,
+  shown only by ⌥-click), and Off in System Settings (turned off outside
+  Tacet: listed, never turned on by «). Changes made in
   System Settings are respected: turning a hidden app on there makes it
   Visible, turning a hidden app off there makes it Off in System Settings.
 - **Hidden apps show as off in System Settings.** If anything goes wrong,

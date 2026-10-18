@@ -27,11 +27,15 @@
 "Apps turned on here hide behind Tacet’s arrow." = "Os apps ativados aqui ficam ocultos atrás da seta do Tacet.";
 "Hide %@ in Tacet" = "Ocultar %@ no Tacet";
 "No apps yet." = "Nenhum app ainda.";
+"Keep Always Hidden" = "Manter Sempre Oculto";
+"More" = "Mais";
+"Always Hidden" = "Sempre Ocultos";
+"Hold ⌥ and click %@ to see these items." = "Segure ⌥ e clique em %@ para ver estes itens.";
+"Move Back" = "Voltar para a Lista";
 "Turned Off in System Settings" = "Desativados nos Ajustes do Sistema";
 "Off" = "Desativado";
 "Hidden by macOS, not by Tacet: « doesn’t show them. Turn them on in System Settings to use them." = "Ocultos pelo macOS, não pelo Tacet: a « não os mostra. Ative-os nos Ajustes do Sistema para usá-los.";
 "Open Menu Bar Settings…" = "Abrir Ajustes da Barra de Menus…";
-"Tip: ⌘-drag your hidden apps to the left end of the menu bar. Then they fade in and out quickly; elsewhere the icons next to them slide over." = "Dica: arraste com ⌘ os apps ocultos até a ponta esquerda da Barra de Menus. Assim eles aparecem e somem rapidamente; em outro lugar, os ícones vizinhos deslizam.";
 "Tacet couldn’t change the menu bar switches." = "O Tacet não conseguiu alterar os ajustes da Barra de Menus.";
 
 /* Open at Login and the keyboard shortcut (macOS's own terms) */
@@ -39,7 +43,9 @@
 "Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login." = "O Tacet está desativado em Ajustes do Sistema › Geral › Itens de Início de Sessão e Extensões. Ative-o lá para abrir o Tacet no início da sessão.";
 "Open Login Items & Extensions…" = "Abrir Itens de Início de Sessão e Extensões…";
 "Keyboard Shortcut" = "Atalho de Teclado";
-"Shows and hides the hidden apps from any app, like clicking the arrow." = "Mostra e oculta os apps ocultos a partir de qualquer app, como clicar na seta.";
+"Show or hide your hidden apps." = "Mostra ou oculta os apps ocultos.";
+"Press %@ to also show always-hidden apps." = "Aperte %@ para mostrar também os sempre ocultos.";
+"%@ is already used by another app." = "%@ já é usado por outro app.";
 "Type Shortcut" = "Digite o Atalho";
 "Type the new shortcut, or press Esc to remove it." = "Digite o novo atalho ou pressione Esc para removê-lo.";
 "Record Shortcut" = "Gravar Atalho";
