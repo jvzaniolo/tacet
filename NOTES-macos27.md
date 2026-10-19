@@ -1405,5 +1405,17 @@ What shipped:
   folders; a security-scoped bookmark per folder (`access.<appID>`). Granted
   here in one go: "Access: granted (picked 2 of 2 folder(s))". No extra
   system prompt.
+- **A divider between the groups was tried and dropped (user):** a second
+  status item (`TacetDivider`, a 1 px line) shown only on ⌥-reveal. Even
+  at length 3 it takes the system's spacing around every item, and showing
+  it pushed the apps aside: MenuBarAgent places a newly shown item a little
+  after a switch write, and showing it 0.2 s before the apps didn't make it
+  feel right. The table may keep an inert `…::TacetDivider` key.
+- **Drags renumber:** on a ⌘-drag MenuBarAgent rewrites the weights of the
+  icons around it to round values (e.g. 400, 368, 336, 298, 264, arrow 232),
+  keeping their on-screen order. So Tacet works from the relative order
+  only, reads the arrow's weight from its live key (`status:<bundle ID>::`
+  in /Applications; a leftover executable-name key once made the arrow jump
+  far left), and ignores keys of owners it doesn't track (old experiments).
 - **Quit** restores the switches, not the old order: the apps come back
   where they were hidden, left of the arrow, which does no harm.

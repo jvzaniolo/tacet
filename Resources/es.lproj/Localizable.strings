@@ -45,8 +45,9 @@
 "Open at Login" = "Abrir al iniciar sesión";
 "Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login." = "Tacet está desactivado en Ajustes del Sistema › General › Ítems de inicio y extensiones. Actívalo allí para abrir Tacet al iniciar sesión.";
 "Open Login Items & Extensions…" = "Abrir ítems de inicio y extensiones…";
-"Keyboard Shortcut" = "Atajo de teclado";
-"Show or hide your hidden apps." = "Muestra u oculta las apps ocultas.";
+"General" = "General";
+"Keyboard Shortcuts" = "Atajos de teclado";
+"Toggle Tacet" = "Alternar Tacet";
 "%@ is already used by another app." = "Otra app ya usa %@.";
 "Type Shortcut" = "Pulsa el atajo";
 "Record Shortcut" = "Grabar atajo";

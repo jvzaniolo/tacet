@@ -78,10 +78,10 @@ and measurements: [NOTES-macos27.md](NOTES-macos27.md) §12–13.
   Hidden** moves the app to the **Always Hidden** section (shown even when
   empty). Those stay off when you click the arrow or press the shortcut;
   ⌥-click the arrow (or press the shortcut with ⌥) to show them together
-  with the hidden ones (closing,
-  the 10 s auto-hide and an outside click hide both again). **Move Back**
-  returns an app to the list, hidden by Tacet. Quit and crash recovery turn
-  them back on like hidden apps (same journal).
+  with the hidden ones (closing, the 10 s auto-hide and an outside click
+  hide both again). **Move Back** returns an app to the list, hidden by
+  Tacet. Quit and crash recovery turn them back on like hidden apps (same
+  journal).
 - **Show / hide:** click « to show the hidden apps in their real places (menus
   open under them, as usual). Click », anywhere outside the menu bar, or Esc
   with no menu open (Esc only if Tacet has Accessibility, which it doesn't

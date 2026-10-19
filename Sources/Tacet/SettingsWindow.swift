@@ -331,16 +331,12 @@ private struct GeneralSection: View {
             if let error = loginItem.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
+        } header: {
+            Text("General")
+        }
 
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Keyboard Shortcut")
-                    Text("Show or hide your hidden apps.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
+        Section {
+            LabeledContent("Toggle Tacet") {
                 ShortcutRecorder(hotkey: hotkey, recorder: recorder)
             }
             // The ⌥ variant: read-only, it follows the shortcut.
@@ -356,6 +352,8 @@ private struct GeneralSection: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        } header: {
+            Text("Keyboard Shortcuts")
         }
     }
 

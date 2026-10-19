@@ -45,8 +45,9 @@
 "Open at Login" = "Open at Login";
 "Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login." = "Tacet is turned off in System Settings › General › Login Items & Extensions. Turn it on there to open Tacet at login.";
 "Open Login Items & Extensions…" = "Open Login Items & Extensions…";
-"Keyboard Shortcut" = "Keyboard Shortcut";
-"Show or hide your hidden apps." = "Show or hide your hidden apps.";
+"General" = "General";
+"Keyboard Shortcuts" = "Keyboard Shortcuts";
+"Toggle Tacet" = "Toggle Tacet";
 "%@ is already used by another app." = "%@ is already used by another app.";
 "Type Shortcut" = "Type Shortcut";
 "Record Shortcut" = "Record Shortcut";
