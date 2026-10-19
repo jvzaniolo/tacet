@@ -20,6 +20,8 @@ Tacet needs macOS 27 or later.
 
 Click the arrow (or press ⇧⌘<) to show your hidden apps; click again to
 tuck them away. They also hide by themselves after a few seconds.
+To keep an app out of sight even then, choose Keep Always Hidden (⋯ next
+to the app); hold ⌥ while clicking the arrow (or press ⌥⇧⌘<) to see it.
 To start Tacet when you log in, turn on Open at Login in its settings.
 Quitting Tacet brings every icon back. The beta works until
 {{EXPIRES_EN}}.
@@ -53,7 +55,9 @@ O Tacet precisa do macOS 27 ou mais recente.
 
 Clique na seta (ou aperte ⇧⌘<) para mostrar os apps ocultos; clique de
 novo para escondê-los. Eles também se escondem sozinhos depois de alguns
-segundos. Para o Tacet abrir quando você entrar no Mac, ative Abrir no
+segundos. Para esconder um app até disso, escolha Manter Sempre Oculto
+(⋯ ao lado do app); segure ⌥ ao clicar na seta (ou aperte ⌥⇧⌘<) para
+vê-lo. Para o Tacet abrir quando você entrar no Mac, ative Abrir no
 Início da Sessão nos ajustes dele. Ao sair do Tacet, todos os ícones
 voltam. O beta funciona até {{EXPIRES_PT}}.
 
@@ -86,9 +90,11 @@ Tacet necesita macOS 27 o posterior.
 
 Haz clic en la flecha (o pulsa ⇧⌘<) para mostrar las apps ocultas; vuelve
 a hacer clic para esconderlas. También se esconden solas tras unos
-segundos. Para que Tacet se abra al iniciar sesión, activa Abrir al
-iniciar sesión en sus ajustes. Al salir de Tacet, todos los iconos
-vuelven. La beta funciona hasta el {{EXPIRES_ES}}.
+segundos. Para ocultar una app incluso entonces, elige Mantener siempre
+oculto (⋯ junto a la app); mantén ⌥ al hacer clic en la flecha (o pulsa
+⌥⇧⌘<) para verla. Para que Tacet se abra al iniciar sesión, activa
+Abrir al iniciar sesión en sus ajustes. Al salir de Tacet, todos los
+iconos vuelven. La beta funciona hasta el {{EXPIRES_ES}}.
 
 Dudas o comentarios: clic derecho en la flecha de Tacet ›
 Enviar comentarios…
