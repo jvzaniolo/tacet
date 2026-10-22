@@ -1419,3 +1419,115 @@ What shipped:
   far left), and ignores keys of owners it doesn't track (old experiments).
 - **Quit** restores the switches, not the old order: the apps come back
   where they were hidden, left of the arrow, which does no harm.
+
+## 23. Measured: reveal, conceal, and the fast close–open–close (2026-10-21)
+
+**Why:** the user: a quick click–click on the arrow (reveal, then conceal
+~150 ms later) "locks": the icons appear at once but stay ~0.6 s before
+they go. Open–close–open is fine. The native overflow arrow on macOS 27
+and (per the user) a quick off–on–off of a switch in System Settings feel
+instant.
+
+### Tooling
+
+None of the tooling shipped (user: not worth a beta for what it found);
+this is how to put it back if needed:
+
+- **Timing lines in Tacet.log**: `ContinuousClock.now` at the start of
+  `ShelfController.reveal/conceal` and `ShelfModel.reveal/conceal`, logged
+  as `Reveal: switches written in N ms, order checked in N ms` / `Reveal:
+  done N ms after the request, click N ms before` (the click's age is
+  `ProcessInfo.systemUptime - NSApp.currentEvent.timestamp`).
+- **Debug triggers**: Darwin notifications observed with
+  `CFNotificationCenterAddObserver` on the Darwin notify center, only with
+  `--debug` or `debugLogging`, that call `shelf.reveal/conceal/toggle`, so
+  a script can time a cycle: `notifyutil -p app.gettacet.Tacet.debug.reveal`.
+- **Strip watcher** (outside the repo, scratch): a ScreenCaptureKit stream of
+  a 260 pt strip of the menu bar around the arrow at 60 fps, printing when
+  the count of light pixels changes. Needs Screen Recording for the
+  measuring tool, not for Tacet. Its own latency is a few frames, so
+  "first pixel" numbers below are ~30–50 ms late; the user's 70 ms GIF
+  gave reveal ≈ 100–140 ms after the click.
+- **MenuBarAgent's log** (`log show --predicate 'process == "MenuBarAgent"'`,
+  default level is persisted): `[SystemItemMenuBarPreferences] Preferences:
+  changed` when it sees the write; `Invalidating scene` when an item is
+  removed; `[com.apple.menubar:animations] Setup update source for
+  displayID` / `Invalidating update source` around its animation sessions
+  (one per display).
+
+### Numbers (Dell U2724DE at 1×, MacBook notch display as second display)
+
+Tacet's own part is small: request → switches written 5 ms, order checked
+2–4 ms, reveal done 20–32 ms (CGWindowList baseline 10–14 ms), conceal done
+10–14 ms. MenuBarAgent logs "Preferences: changed" 3–17 ms after the
+request (the notification hop included).
+
+| Cycle | Second request | Icons gone (from the 2nd request) | Gone (from the reveal) |
+| --- | --- | --- | --- |
+| reveal → conceal, user's GIF | +156 ms | ~610 ms | ~770 ms |
+| reveal → conceal | +300 ms | ~350 ms | ~660 ms |
+| reveal → conceal | +430 ms | ~250 ms | ~690 ms |
+| reveal → conceal | +630 ms | ~90 ms | — |
+| reveal → conceal | +800 ms, +2 s | ~90 ms | — |
+| conceal → reveal | +270 ms | icons shown ~230 ms (same as cold) | — |
+
+Reveal alone: first pixels ~180–230 ms after the request (watcher), fade
+~60–90 ms, nothing else moves (the hidden group is leftmost). Conceal
+alone: gone ~90 ms after the request. Same on the notch display.
+
+### Finding
+
+MenuBarAgent runs an **animation session of ~550 ms per display** after
+an insertion (`Setup update source` ~60 ms after our write → `Invalidating
+update source` ~550 ms later; the second display's lasts ~750 ms), although
+the visible fade is over in ~90 ms. **A removal requested during that
+session is applied when the session ends**, then fades out: the icons go
+~650–700 ms after the reveal whatever the moment of the conceal. The
+switches are flipped and the item scenes invalidated within ~20 ms of the
+conceal; only the drawing waits. A removal's session doesn't hold up a
+following insertion, which is why open–close–open feels fine.
+
+Ruled out on this Mac (each tried with a 300 ms gap, same ~650–700 ms):
+- the arrow's redraw (`«`/`»`): skipped, no change;
+- the number of items: one app (1Password alone, MacVirt alone, written
+  like a Settings switch) behaves the same as the four;
+- `TrailingItemPreferredPositions`: with the two apps' keys removed from
+  the table, same timing (the keys were put back from the backup);
+- Tacet's own pipeline: 10–30 ms in total.
+
+So there is nothing in Tacet to speed up for this case; the wait is
+MenuBarAgent's. **System Settings waits the same way** (user's hand test
+at 21:54, Stats' switch off → on → off, read from MenuBarAgent's log): on
+at 23.308, scenes created +20 ms, session from 23.368; off at 23.462
+(+154 ms), scenes invalidated +10 ms, but the session ran to 23.928
+(+560 ms) and only then the removal's own session started (23.928–24.849,
+a slide, since Stats isn't leftmost). The same lock, through the same
+preference; the switch's own animation is what feels instant there. The
+native overflow arrow is a different mechanism (an overlay window), hence
+instant.
+
+Tried to interrupt the session from outside, each as "conceal + X" 300 ms
+after a reveal; none changed the ~650–700 ms:
+- rewriting `TrailingItemPreferredPositions` as is (a no-op write);
+- nudging the hidden apps' weights by 0.01;
+- a momentary width change of the arrow (length 30 for 50 ms);
+- flipping the switches on and off again 100 ms later: worse, the queued
+  removal is applied at the session's end, then the insertion at once,
+  then another ~550 ms session before the final removal.
+
+Reduce Motion (Accessibility › Display, flipped by the user; the
+`com.apple.universalaccess` domain can't be written from a script): no
+change, the quick close–open–close waits the same. So the session isn't
+a spring's settle time that the setting would cut. Not tried: restarting
+MenuBarAgent.
+
+**One small gain found, not shipped:** writing the switches before the
+CGWindowList baseline on reveal (the listing takes 10–15 ms) brings the
+write to 8–16 ms after the request instead of ~20–30 ms. Dropped with the
+rest: not worth a beta on its own.
+
+**Decisions (user, 2026-10-21):** the arrow keeps flipping at once on the
+click (an arrow that waited for the icons was offered and declined). A
+Feedback Assistant report was drafted in
+`docs/feedback/FB-menubar-removal-deferred.md`, with the log excerpt and
+the GIF next to it.
