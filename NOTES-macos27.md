@@ -1527,7 +1527,7 @@ write to 8–16 ms after the request instead of ~20–30 ms. Dropped with the
 rest: not worth a beta on its own.
 
 **Decisions (user, 2026-10-21):** the arrow keeps flipping at once on the
-click (an arrow that waited for the icons was offered and declined). A
-Feedback Assistant report was drafted in
-`docs/feedback/FB-menubar-removal-deferred.md`, with the log excerpt and
-the GIF next to it.
+click (an arrow that waited for the icons was offered and declined). Filed with
+Apple as **FB25279892** (2026-10-21; the text is in
+`docs/feedback/FB-menubar-removal-deferred.pt-BR.md`, with the log excerpt
+next to it).
