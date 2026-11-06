@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="Icon/previews/glass-dark.png">
-    <img src="Icon/previews/glass-light.png" alt="Tacet app icon" width="160">
-  </picture>
+  <img src="Icon/export/tacet-icon-512.png" alt="Tacet app icon" width="160">
 </p>
 
 # Tacet
