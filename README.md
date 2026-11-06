@@ -249,3 +249,7 @@ Sources/Tacet/
   Beta.swift                  Build info, beta expiry window, feedback link
   Log.swift                   Console / unified log / ~/Library/Logs output
 ```
+
+## License
+
+Tacet is released under the [MIT License](LICENSE).

@@ -1528,6 +1528,4 @@ rest: not worth a beta on its own.
 
 **Decisions (user, 2026-10-21):** the arrow keeps flipping at once on the
 click (an arrow that waited for the icons was offered and declined). Filed with
-Apple as **FB25279892** (2026-10-21; the text is in
-`docs/feedback/FB-menubar-removal-deferred.pt-BR.md`, with the log excerpt
-next to it).
+Apple as **FB25279892** (2026-10-21).
